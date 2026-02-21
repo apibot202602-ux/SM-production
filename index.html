@@ -3,88 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SM Migration - Phase 1</title>
-    <!-- ใช้ SweetAlert2 เพื่อความสวยงามในการแจ้งเตือน -->
+    <title>SM Production App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f4f7f6; }
-        .test-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
-        .btn-test { background: #4361ee; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.3s; }
-        .btn-test:hover { background: #3a0ca3; }
-        #result { margin-top: 20px; text-align: left; background: #f8fafc; padding: 10px; border-radius: 5px; font-size: 14px; color: #334155; display: none; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4361ee; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: none; margin: 10px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background: #f8fafc; font-family: sans-serif; }
+        .screen { display: none; padding: 20px; }
+        .active { display: block; }
+        .card-job { background: white; border-radius: 12px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #4361ee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        #loading { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; display:none; flex-direction:column; justify-content:center; align-items:center; }
     </style>
 </head>
 <body>
 
-<div class="test-card">
-    <h2 style="color: #1e293b;">เฟส 1: ทดสอบการเชื่อมต่อ</h2>
-    <p style="color: #64748b;">กดปุ่มด้านล่างเพื่อทดสอบดึงรายชื่อเครื่องจักรจาก Google Sheets</p>
-    
-    <div class="loader" id="loader"></div>
-    <button class="btn-test" id="btnTest" onclick="testConnection()">ทดสอบดึงข้อมูล (Connect)</button>
-
-    <div id="result">
-        <strong>พบเครื่องจักร:</strong>
-        <ul id="machineList"></ul>
+    <div id="loading">
+        <div class="spinner-border text-primary"></div>
+        <div class="mt-2 fw-bold">กำลังดึงข้อมูล...</div>
     </div>
-</div>
+
+    <!-- หน้าจอ 1: เลือกเครื่องจักร -->
+    <div id="screen-login" class="screen active">
+        <div class="container text-center mt-5">
+            <h3 class="fw-bold mb-4">SM Production Login</h3>
+            <div class="card p-4 shadow-sm mx-auto" style="max-width: 400px; border-radius: 15px;">
+                <select id="machine-select" class="form-select form-select-lg mb-3 text-center">
+                    <option value="">-- เลือกเครื่องจักร --</option>
+                </select>
+                <button class="btn btn-primary btn-lg w-100" onclick="enterSystem()">เข้าสู่ระบบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้าจอ 2: รายการงาน (Queue) -->
+    <div id="screen-queue" class="screen">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold m-0">งานรอผลิต: <span id="display-machine" class="text-primary"></span></h4>
+            <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()">Logout</button>
+        </div>
+        <div id="job-list-container"></div>
+    </div>
 
 <script>
-    // --- ตั้งค่าการเชื่อมต่อ (สำคัญมาก) ---
-    // 1. วาง URL ที่ก๊อปมาจาก Google Script (ขั้นตอนที่ 3) ตรงนี้ครับ
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzl5VXzGxJo4SnuzkO4G6axSm1rAmBzAQ-9NAQPxEOmtiTVqxbZqmro6-RS94YhYYcJ/exec"; 
-    
-    // 2. รหัสต้องตรงกับที่ตั้งไว้ใน Code.gs (ถ้าตั้งตามผมคือ TMT2026)
-    const API_KEY = "TMT2026"; 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzl5VXzGxJo4SnuzkO4G6axSm1rAmBzAQ-9NAQPxEOmtiTVqxbZqmro6-RS94YhYYcJ/exec";
+    const API_KEY = "TMT2026";
+    let ALL_DATA = { machines: [], jobs: [] };
+    let SELECTED_MACHINE = "";
 
-    async function testConnection() {
-        const btn = document.getElementById('btnTest');
-        const loader = document.getElementById('loader');
-        const resultDiv = document.getElementById('result');
-        const list = document.getElementById('machineList');
-
-        // แสดง Loading
-        btn.disabled = true;
-        loader.style.display = 'block';
-        resultDiv.style.display = 'none';
-
+    // ฟังก์ชันตัวกลางในการคุยกับ Google Script
+    async function callGAS(action, data = {}) {
+        document.getElementById('loading').style.display = 'flex';
         try {
             const response = await fetch(GAS_URL, {
                 method: 'POST',
-                body: JSON.stringify({
-                    apiKey: API_KEY,
-                    action: 'getInitialData'
-                })
+                body: JSON.stringify({ apiKey: API_KEY, action: action, data: data })
             });
-
-            const data = await response.json();
-
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            // แสดงผลลัพธ์
-            list.innerHTML = "";
-            data.machines.forEach(m => {
-                const li = document.createElement('li');
-                li.innerText = m;
-                list.appendChild(li);
-            });
-
-            resultDiv.style.display = 'block';
-            Swal.fire('สำเร็จ!', 'เชื่อมต่อกับ Google Sheets เรียบร้อยแล้ว', 'success');
-
+            const result = await response.json();
+            if (result.error) throw new Error(result.error);
+            return result;
         } catch (err) {
-            console.error(err);
-            Swal.fire('เชื่อมต่อไม่สำเร็จ', 'สาเหตุ: ' + err.message, 'error');
+            Swal.fire('Error', err.message, 'error');
         } finally {
-            btn.disabled = false;
-            loader.style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
         }
     }
-</script>
 
+    // โหลดข้อมูลเริ่มต้น
+    window.onload = async () => {
+        const data = await callGAS('getInitialData');
+        if (data) {
+            ALL_DATA = data;
+            const select = document.getElementById('machine-select');
+            data.machines.forEach(m => {
+                let opt = new Option(m, m);
+                select.add(opt);
+            });
+        }
+    };
+
+    function enterSystem() {
+        SELECTED_MACHINE = document.getElementById('machine-select').value;
+        if (!SELECTED_MACHINE) return Swal.fire('โปรดเลือกเครื่องจักร', '', 'warning');
+        
+        document.getElementById('display-machine').innerText = SELECTED_MACHINE;
+        renderJobs();
+        switchScreen('screen-queue');
+    }
+
+    function renderJobs() {
+        const container = document.getElementById('job-list-container');
+        container.innerHTML = "";
+        
+        const myJobs = ALL_DATA.jobs.filter(j => j.machine === SELECTED_MACHINE && j.status !== 'Finished');
+
+        if (myJobs.length === 0) {
+            container.innerHTML = "<p class='text-center mt-5 text-muted'>ไม่มีงานค้างผลิต</p>";
+            return;
+        }
+
+        myJobs.forEach(j => {
+            const div = document.createElement('div');
+            div.className = 'card-job';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="fw-bold fs-5">${j.jobId}</div>
+                        <div class="small text-muted">${j.customer}</div>
+                        <div class="badge bg-light text-dark border mt-2">${j.thickness} mm</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">ผลิตแล้ว</div>
+                        <div class="fw-bold text-success">${j.produced} / ${j.totalCoils}</div>
+                        <button class="btn btn-primary btn-sm mt-2" onclick="alert('เดี๋ยวเฟส 3 เรามาทำปุ่มเริ่มงานกันครับ')">รายละเอียด</button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function switchScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+</script>
 </body>
 </html>
