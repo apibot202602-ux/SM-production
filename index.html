@@ -3,52 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SM Production - Migration Phase 1</title>
+    <title>SM Production - Migration Phase 2</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #4361ee; --bg: #f8fafc; }
-        body { background-color: var(--bg); font-family: sans-serif; }
+        body { background-color: var(--bg); font-family: sans-serif; padding-bottom: 50px; }
         .screen { display: none; padding: 20px; }
         .active-screen { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .card-job { background: white; border-radius: 16px; padding: 15px; margin-bottom: 12px; border-left: 5px solid #e2e8f0; transition: 0.2s; }
-        .card-job.running { border-left-color: #10b981; background: #f0fdf4; }
-        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        .card-custom { background: white; border-radius: 20px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        #reader { width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
     </style>
 </head>
 <body>
 
-    <div id="loading"><div class="spinner-border text-primary"></div><div class="mt-2 fw-bold">SM CONNECTING...</div></div>
+    <div id="loading"><div class="spinner-grow text-primary"></div><div class="mt-2 fw-bold">PROCESSING...</div></div>
 
     <div class="container" style="max-width: 600px;">
-        <!-- SCREEN: LOGIN -->
+        
+        <!-- SCREEN 1: LOGIN (เหมือนเดิม) -->
         <div id="screen-login" class="screen active-screen">
             <div class="text-center mt-5">
-                <div class="mb-4"><i class="fa-solid fa-industry text-primary fa-4x"></i></div>
+                <i class="fa-solid fa-industry text-primary fa-4x mb-3"></i>
                 <h3 class="fw-bold">SM Production</h3>
-                <div class="card p-4 shadow-sm border-0 mt-4" style="border-radius: 20px;">
+                <div class="card-custom p-4 mt-4 shadow-sm">
                     <select id="machine-select" class="form-select form-select-lg mb-3"></select>
-                    <button class="btn btn-primary btn-lg w-100 py-3 fw-bold" onclick="enterSystem()">Login</button>
+                    <button class="btn btn-primary btn-lg w-100 py-3 fw-bold" style="border-radius: 12px;" onclick="enterSystem()">Login</button>
                 </div>
             </div>
         </div>
 
-        <!-- SCREEN: QUEUE -->
+        <!-- SCREEN 2: QUEUE (เหมือนเดิม) -->
         <div id="screen-queue" class="screen">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="fw-bold m-0">งานรอผลิต: <span id="mc-tag" class="text-primary"></span></h4>
-                <button class="btn btn-light rounded-circle shadow-sm" onclick="location.reload()"><i class="fa-solid fa-power-off"></i></button>
-            </div>
+            <h4 class="fw-bold mb-4">งานรอผลิต: <span id="mc-tag" class="text-primary"></span></h4>
             <div id="job-list"></div>
         </div>
+
+        <!-- SCREEN 3: RECORDING (ใหม่!) -->
+        <div id="screen-record" class="screen">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <button class="btn btn-light rounded-circle shadow-sm" onclick="switchScreen('screen-queue')"><i class="fa-solid fa-arrow-left"></i></button>
+                <h5 class="fw-bold m-0" id="current-job-title">RECORD DATA</h5>
+                <div></div>
+            </div>
+
+            <div class="card-custom p-3 bg-dark text-white mb-3">
+                <div class="small opacity-75">Customer:</div>
+                <div id="current-customer" class="fw-bold">...</div>
+            </div>
+
+            <div class="card-custom p-4 shadow-sm">
+                <button class="btn btn-outline-primary w-100 mb-3 py-3 fw-bold" onclick="openScanner()">
+                    <i class="fa-solid fa-qrcode me-2"></i> สแกน QR Tag (Coil)
+                </button>
+                <div id="reader-container" style="display:none;" class="mb-3">
+                    <div id="reader"></div>
+                    <button class="btn btn-danger btn-sm w-100 mt-2" onclick="stopScanner()">ปิดกล้อง</button>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="small fw-bold">Mill No.</label><input type="text" id="millNo" class="form-control form-control-lg"></div>
+                    <div class="col-6"><label class="small fw-bold">Coil Seq.</label><input type="text" id="coilNo" class="form-control form-control-lg" placeholder="1/4"></div>
+                    <div class="col-12"><label class="small fw-bold">น้ำหนัก (kg)</label><input type="number" id="weight" class="form-control form-control-lg text-primary fw-bold"></div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-4 text-center"><label class="small">หนา (หัว)</label><input type="number" id="thkH" step="0.001" class="form-control text-center"></div>
+                    <div class="col-4 text-center"><label class="small">หนา (กลาง)</label><input type="number" id="thkM" step="0.001" class="form-control text-center"></div>
+                    <div class="col-4 text-center"><label class="small">หนา (ท้าย)</label><input type="number" id="thkT" step="0.001" class="form-control text-center"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="small fw-bold"><i class="fa-solid fa-camera"></i> ถ่ายรูปหน้างาน</label>
+                    <input type="file" id="file-input" class="form-control" accept="image/*" multiple>
+                </div>
+
+                <button class="btn btn-primary btn-lg w-100 py-3 fw-bold mt-3" style="border-radius: 12px;" onclick="handleSave()">
+                    <i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูล
+                </button>
+            </div>
+        </div>
+
     </div>
 
 <script>
-    // --- 1. API BRIDGE ---
+    // --- API CONFIG (เปลี่ยนเป็นของคุณ) ---
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzl5VXzGxJo4SnuzkO4G6axSm1rAmBzAQ-9NAQPxEOmtiTVqxbZqmro6-RS94YhYYcJ/exec"; 
     const API_KEY = "TMT2026";
+
+    let ALL_DATA = {};
+    let SELECTED_MC = "";
+    let CURRENT_JOB = null;
+    let html5QrCode = null;
 
     async function callGAS(action, data = {}) {
         document.getElementById('loading').style.display = 'flex';
@@ -60,17 +110,11 @@
             const res = await response.json();
             if (res.error) throw new Error(res.error);
             return res;
-        } catch (err) {
-            Swal.fire("API Connection Error", err.message, "error");
-        } finally {
-            document.getElementById('loading').style.display = 'none';
-        }
+        } catch (err) { Swal.fire("Error", err.message, "error"); }
+        finally { document.getElementById('loading').style.display = 'none'; }
     }
 
-    // --- 2. CORE LOGIC ---
-    let ALL_DATA = {};
-    let SELECTED_MC = "";
-
+    // --- PHASE 1 LOGIC (Login & Queue) ---
     window.onload = async () => {
         const data = await callGAS('getInitialData');
         if (data) {
@@ -93,24 +137,15 @@
         const cont = document.getElementById('job-list');
         cont.innerHTML = "";
         const myJobs = ALL_DATA.jobs.filter(j => j.machine === SELECTED_MC && j.status !== 'Finished');
-
         myJobs.forEach(j => {
             const isRun = j.status === 'Running';
             const div = document.createElement('div');
-            div.className = `card-job shadow-sm ${isRun ? 'running' : ''}`;
+            div.style = "background:white; border-radius:15px; padding:15px; margin-bottom:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border-left:5px solid " + (isRun?'#10b981':'#4361ee');
             div.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="badge ${isRun?'bg-success':'bg-primary'} mb-1">${j.status}</span>
-                        <div class="fw-bold fs-5">${j.jobId}</div>
-                        <div class="small text-muted">${j.customer} | ${j.thickness} mm</div>
-                    </div>
+                    <div><div class="fw-bold fs-5">${j.jobId}</div><div class="small text-muted">${j.customer}</div></div>
                     <div class="d-flex gap-2">
-                        ${isRun ? 
-                          `<button class="btn btn-warning btn-sm fw-bold" onclick="pauseJob('${j.jobId}')">PAUSE</button>
-                           <button class="btn btn-success btn-sm fw-bold" onclick="alert('เดี๋ยวเฟส 2 เรามาทำหน้าบันทึกกันครับ')">บันทึก</button>` : 
-                          `<button class="btn btn-primary btn-sm px-3" onclick="startJob('${j.jobId}')">START</button>`
-                        }
+                        ${isRun ? `<button class="btn btn-success px-4" onclick="openRecord('${j.jobId}')">บันทึก</button>` : `<button class="btn btn-primary" onclick="startJob('${j.jobId}')">START</button>`}
                     </div>
                 </div>`;
             cont.appendChild(div);
@@ -120,19 +155,89 @@
     async function startJob(id) {
         const res = await callGAS('startJob', { jobId: id });
         if (res === "SUCCESS") {
-            Swal.fire({ icon:'success', title:'เริ่มงานแล้ว', timer:1000, showConfirmButton:false });
-            // อัปเดตข้อมูลในเครื่องโดยไม่ต้องโหลดใหม่ทั้งหมด
             ALL_DATA.jobs.find(j => j.jobId === id).status = 'Running';
             renderJobs();
         }
     }
 
-    async function pauseJob(id) {
-        const res = await callGAS('pauseJob', { jobId: id });
-        if (res === "SUCCESS") {
-            ALL_DATA.jobs.find(j => j.jobId === id).status = 'Waiting';
-            renderJobs();
+    // --- PHASE 2 LOGIC (Recording & Media) ---
+    function openRecord(jobId) {
+        CURRENT_JOB = ALL_DATA.jobs.find(j => j.jobId === jobId);
+        document.getElementById('current-job-title').innerText = CURRENT_JOB.jobId;
+        document.getElementById('current-customer').innerText = CURRENT_JOB.customer;
+        switchScreen('screen-record');
+    }
+
+    function openScanner() {
+        document.getElementById('reader-container').style.display = 'block';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (decodedText) => {
+            const data = decodedText.split(",");
+            if(data[0]) document.getElementById('millNo').value = data[0];
+            if(data[4]) document.getElementById('weight').value = data[4];
+            stopScanner();
+            Swal.fire({ icon:'success', title:'สแกนสำเร็จ', timer:1000, showConfirmButton:false });
+        }).catch(err => Swal.fire("Camera Error", err, "error"));
+    }
+
+    function stopScanner() {
+        if(html5QrCode) {
+            html5QrCode.stop().then(() => { document.getElementById('reader-container').style.display = 'none'; });
         }
+    }
+
+    async function handleSave() {
+        const fileInput = document.getElementById('file-input');
+        let fileList = [];
+
+        // บีบอัดรูปภาพก่อนส่ง (เพื่อความเร็ว)
+        if (fileInput.files.length > 0) {
+            for (let file of fileInput.files) {
+                const compressed = await compressImage(file);
+                fileList.push(compressed);
+            }
+        }
+
+        const formData = {
+            jobId: CURRENT_JOB.jobId,
+            machine: SELECTED_MC,
+            millNo: document.getElementById('millNo').value,
+            coilNo: document.getElementById('coilNo').value,
+            weight: document.getElementById('weight').value,
+            thickH1: document.getElementById('thkH').value,
+            thickM1: document.getElementById('thkM').value,
+            thickT1: document.getElementById('thkT').value,
+            note: ""
+        };
+
+        const res = await callGAS('saveLogAndSlits', { formData: formData, fileList: fileList });
+        if (res === "SUCCESS") {
+            Swal.fire("บันทึกสำเร็จ", "", "success").then(() => { location.reload(); });
+        }
+    }
+
+    function compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const maxW = 800;
+                    canvas.width = maxW;
+                    canvas.height = (img.height / img.width) * maxW;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve({
+                        name: file.name,
+                        mimeType: "image/jpeg",
+                        data: canvas.toDataURL("image/jpeg", 0.7).split(',')[1]
+                    });
+                };
+            };
+        });
     }
 
     function switchScreen(id) {
