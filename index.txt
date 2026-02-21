@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SM Production Mini</title>
+    <!-- ใช้เครื่องมือช่วยสแกน QR -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #reader { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>บันทึกการผลิต (แบบง่าย)</h2>
+    
+    <button onclick="startScan()" style="background: #28a745;">📷 เปิดกล้องสแกน QR</button>
+    <div id="reader"></div>
+
+    <input type="text" id="jobId" placeholder="Job ID">
+    <input type="text" id="mill" placeholder="Mill No.">
+    <input type="number" id="weight" placeholder="น้ำหนัก (kg)">
+    <input type="number" id="thickness" placeholder="ความหนา (mm)">
+    
+    <button onclick="saveData()" id="btnSave">บันทึกข้อมูล</button>
+</div>
+
+<script>
+    // 1. วาง URL ที่ได้จาก Google Script ตรงนี้
+    const WEB_APP_URL = "วาง_URL_เว็บแอป_ของคุณตรงนี้";
+
+    let html5QrCode;
+
+    function startScan() {
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: 250 },
+            (decodedText) => {
+                document.getElementById("jobId").value = decodedText; // เอาค่าที่สแกนได้ใส่ใน Job ID
+                html5QrCode.stop();
+                alert("สแกนสำเร็จ!");
+            }
+        ).catch(err => alert("เปิดกล้องไม่ได้: " + err));
+    }
+
+    async function saveData() {
+        const btn = document.getElementById("btnSave");
+        btn.disabled = true;
+        btn.innerText = "กำลังบันทึก...";
+
+        const payload = {
+            jobId: document.getElementById("jobId").value,
+            mill: document.getElementById("mill").value,
+            weight: document.getElementById("weight").value,
+            thickness: document.getElementById("thickness").value
+        };
+
+        try {
+            await fetch(WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors", // จำเป็นสำหรับ Google Script
+                body: JSON.stringify(payload)
+            });
+            alert("บันทึกสำเร็จ!");
+            location.reload(); // เคลียร์หน้าจอ
+        } catch (err) {
+            alert("เกิดข้อผิดพลาด: " + err);
+            btn.disabled = false;
+            btn.innerText = "บันทึกข้อมูล";
+        }
+    }
+</script>
+
+</body>
+</html>
