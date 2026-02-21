@@ -106,14 +106,17 @@
     </div>
 
 <script>
+    // 1. ตรวจสอบ URL นี้ให้ชัวร์ว่าลงท้ายด้วย /exec
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzl5VXzGxJo4SnuzkO4G6axSm1rAmBzAQ-9NAQPxEOmtiTVqxbZqmro6-RS94YhYYcJ/exec";
-    const API_KEY = "TMT2026";
+    const API_KEY = "TMT2026"; 
+    
     let ALL_DATA = { machines: [], jobs: [] };
     let SELECTED_MACHINE = "";
     let CURRENT_JOB = null;
     let PREDICTION = null;
     let html5QrCode = null;
 
+    // ปรับปรุงฟังก์ชันเรียก API ให้ดักจับ Error ได้ดีขึ้น
     async function callGAS(action, data = {}) {
         document.getElementById('loading').style.display = 'flex';
         try {
@@ -121,42 +124,48 @@
                 method: 'POST',
                 body: JSON.stringify({ apiKey: API_KEY, action: action, data: data })
             });
-            return await response.json();
+            const result = await response.json();
+            
+            // ถ้า Backend ส่ง Error กลับมา
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            return result;
         } catch (err) {
-            Swal.fire('API Error', 'เชื่อมต่อล้มเหลว', 'error');
+            console.error("API Error:", err);
+            Swal.fire({
+                icon: 'error',
+                title: 'การเชื่อมต่อผิดพลาด',
+                text: 'สาเหตุ: ' + err.message,
+                footer: 'ตรวจสอบ API Key หรือสิทธิ์การเข้าถึง (Anyone)'
+            });
+            return null; // ส่งค่า null กลับไปเพื่อให้โค้ดหลักรู้ว่าพัง
         } finally {
             document.getElementById('loading').style.display = 'none';
         }
     }
 
+    // ปรับปรุงการโหลดข้อมูลเริ่มต้น
     window.onload = async () => {
-        showLoading();
-        try {
-            const data = await callGAS('getInitialData');
-            console.log("Received Data:", data); // ดูค่าใน Console
-
-            if (data && data.machines) {
-                ALL_DATA = data;
-                const select = document.getElementById('machine-select');
-                select.innerHTML = '<option value="" selected disabled>-- เลือกเครื่องจักร --</option>';
-                
-                // แก้ไขจุดที่เคย Error: เช็กก่อนว่ามีข้อมูลไหม
-                data.machines.forEach(m => {
-                    let opt = new Option(m, m);
-                    select.add(opt);
-                });
-            } else {
-                // ถ้าข้อมูลไม่มา ให้แสดง Error ชัดๆ
-                Swal.fire('API Error', 'Backend ส่งข้อมูลมาไม่ถูกต้อง หรือ API Key ไม่ตรงกัน', 'error');
-            }
-        } catch (err) {
-            console.error(err);
-            Swal.fire('Connection Error', 'ติดต่อ Google Script ไม่ได้: ' + err.message, 'error');
-        } finally {
-            hideLoading();
+        const data = await callGAS('getInitialData');
+        
+        // ตรวจสอบว่ามีข้อมูลกลับมาจริงไหมก่อนจะทำงานต่อ
+        if (data && data.machines) {
+            ALL_DATA = data;
+            const select = document.getElementById('machine-select');
+            select.innerHTML = '<option value="" selected disabled>-- เลือกเครื่องจักร --</option>';
+            
+            data.machines.forEach(m => {
+                let opt = new Option(m, m);
+                select.add(opt);
+            });
+            console.log("Load success:", data.machines.length, "machines found.");
+        } else {
+            console.error("Failed to load initial data. Data is:", data);
         }
     };
 
+    // --- ฟังก์ชันอื่นๆ (ก๊อปปี้ของเดิมมาใส่ต่อได้เลยครับ) ---
     function enterSystem() {
         SELECTED_MACHINE = document.getElementById('machine-select').value;
         if (!SELECTED_MACHINE) return;
@@ -187,9 +196,7 @@
 
     async function startJob(jobId) {
         showLoading();
-        // 1. เปลี่ยนสถานะใน Sheet
         await callGAS('startJob', { jobId: jobId });
-        // 2. ดึง AI Prediction
         const pred = await callGAS('getSmartPrediction', { jobId: jobId });
         
         CURRENT_JOB = ALL_DATA.jobs.find(j => j.jobId === jobId);
@@ -198,9 +205,8 @@
         document.getElementById('run-job-id').innerText = CURRENT_JOB.jobId;
         document.getElementById('run-customer').innerText = CURRENT_JOB.customer;
         
-        if (pred.found) {
+        if (pred && pred.found) {
             document.getElementById('prediction-conf').innerText = "AI Confidence: " + pred.confidence;
-            // ใส่ค่าทำนายลงในช่องกรอก (ตำแหน่งหัวม้วน)
             document.getElementById('t1').value = pred.prediction.H.t1;
             document.getElementById('t2').value = pred.prediction.H.t2;
             document.getElementById('t3').value = pred.prediction.H.t3;
@@ -214,7 +220,6 @@
     function drawProfile() {
         const canvas = document.getElementById('profileCanvas');
         const ctx = canvas.getContext('2d');
-        // Logic วาดหน้าตัดเหล็กแบบ Real-time (ขอละย่อเพื่อความสั้น)
         ctx.clearRect(0,0,canvas.width,canvas.height);
         ctx.fillStyle = "#3b82f6";
         ctx.beginPath();
@@ -252,7 +257,7 @@
         };
 
         const res = await callGAS('saveProductionLog', { formObj: formObj, fileList: [] });
-        if (res.includes("SUCCESS")) {
+        if (res && res.includes("SUCCESS")) {
             Swal.fire('บันทึกสำเร็จ', '', 'success').then(() => location.reload());
         }
     }
@@ -266,4 +271,5 @@
 </script>
 </body>
 </html>
+
 
