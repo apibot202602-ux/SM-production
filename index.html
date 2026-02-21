@@ -130,11 +130,30 @@
     }
 
     window.onload = async () => {
-        const data = await callGAS('getInitialData');
-        if (data) {
-            ALL_DATA = data;
-            const select = document.getElementById('machine-select');
-            data.machines.forEach(m => select.add(new Option(m, m)));
+        showLoading();
+        try {
+            const data = await callGAS('getInitialData');
+            console.log("Received Data:", data); // ดูค่าใน Console
+
+            if (data && data.machines) {
+                ALL_DATA = data;
+                const select = document.getElementById('machine-select');
+                select.innerHTML = '<option value="" selected disabled>-- เลือกเครื่องจักร --</option>';
+                
+                // แก้ไขจุดที่เคย Error: เช็กก่อนว่ามีข้อมูลไหม
+                data.machines.forEach(m => {
+                    let opt = new Option(m, m);
+                    select.add(opt);
+                });
+            } else {
+                // ถ้าข้อมูลไม่มา ให้แสดง Error ชัดๆ
+                Swal.fire('API Error', 'Backend ส่งข้อมูลมาไม่ถูกต้อง หรือ API Key ไม่ตรงกัน', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            Swal.fire('Connection Error', 'ติดต่อ Google Script ไม่ได้: ' + err.message, 'error');
+        } finally {
+            hideLoading();
         }
     };
 
@@ -247,3 +266,4 @@
 </script>
 </body>
 </html>
+
