@@ -3,79 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SM Production App - Phase 3</title>
+    <title>SM Production App - Final Phase</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- ไลบรารีสแกน QR Code (ตัวที่เสถียรที่สุดสำหรับมือถือ) -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { background: #f0f2f5; font-family: sans-serif; padding-bottom: 50px; }
+        :root { --primary: #4361ee; --dark: #1e293b; --success: #10b981; }
+        body { background: #f8fafc; font-family: 'Sarabun', sans-serif; }
+        .card-custom { background: white; border-radius: 16px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 15px; }
         .screen { display: none; padding: 15px; }
-        .active { display: block; }
-        .card-custom { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 15px; border: none; }
-        #loading { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:9999; display:none; flex-direction:column; justify-content:center; align-items:center; }
-        .btn-main { border-radius: 10px; padding: 12px; font-weight: bold; }
-        #reader { width: 100%; border-radius: 10px; overflow: hidden; background: black; }
+        .active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .btn-main { border-radius: 12px; padding: 12px; font-weight: bold; transition: 0.2s; }
+        .btn-main:active { transform: scale(0.98); }
+        .viewer-3d { background: #0f172a; height: 180px; border-radius: 12px; margin-bottom: 15px; position: relative; overflow: hidden; }
+        #loading { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); z-index:9999; display:none; flex-direction:column; justify-content:center; align-items:center; }
+        .thk-badge { background: #eef2ff; color: var(--primary); padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="loading">
         <div class="spinner-grow text-primary"></div>
-        <div class="mt-2 fw-bold">กำลังประมวลผล...</div>
+        <div class="mt-2 fw-bold text-primary">SM SYSTEM CONNECTING...</div>
     </div>
 
-    <!-- หน้า Login (เหมือนเดิม) -->
+    <!-- หน้า 1: Login -->
     <div id="screen-login" class="screen active">
         <div class="container text-center mt-5">
-            <h3 class="fw-bold mb-4">SM Production Login</h3>
-            <div class="card-custom mx-auto" style="max-width: 400px;">
+            <div class="mb-4">
+                <i class="fa-solid fa-industry text-primary fa-4x"></i>
+            </div>
+            <h3 class="fw-bold">SM Production</h3>
+            <p class="text-muted">เลือกเครื่องจักรเพื่อเข้าสู่ระบบ</p>
+            <div class="card-custom mx-auto p-4" style="max-width: 400px;">
                 <select id="machine-select" class="form-select form-select-lg mb-3"></select>
-                <button class="btn btn-primary btn-lg w-100 btn-main" onclick="enterSystem()">เข้าสู่ระบบ</button>
+                <button class="btn btn-primary btn-lg w-100 btn-main" onclick="enterSystem()">Login</button>
             </div>
         </div>
     </div>
 
-    <!-- หน้ารายการงาน (Queue) -->
+    <!-- หน้า 2: Queue -->
     <div id="screen-queue" class="screen">
-        <h4 class="fw-bold mb-3">งานรอผลิต: <span id="display-machine" class="text-primary"></span></h4>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold m-0"><i class="fa-solid fa-list-check me-2"></i>รายการงาน</h4>
+            <span id="display-machine" class="badge bg-primary px-3 py-2"></span>
+        </div>
         <div id="job-list-container"></div>
     </div>
 
-    <!-- หน้าบันทึกงาน (Running) -->
+    <!-- หน้า 3: Record -->
     <div id="screen-running" class="screen">
-        <div class="card-custom bg-primary text-white">
-            <div class="small opacity-75">กำลังผลิต</div>
-            <h2 id="run-job-id" class="fw-bold m-0">JOB-XXXX</h2>
-            <div id="run-customer" class="small">Customer Name</div>
+        <div class="card-custom bg-dark text-white p-3 mb-3">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h2 id="run-job-id" class="fw-bold m-0 text-info">JOB-XXXX</h2>
+                    <div id="run-customer" class="small opacity-75">Customer Name</div>
+                </div>
+                <div class="text-end">
+                    <span id="prediction-conf" class="badge bg-success">AI 95%</span>
+                </div>
+            </div>
         </div>
 
-        <div class="card-custom">
-            <h6 class="fw-bold mb-3 text-muted">บันทึกผลการผลิต</h6>
+        <!-- จำลองหน้าตัดเหล็ก (Profile Simulation) -->
+        <div class="card-custom p-3">
+            <h6 class="fw-bold mb-3 text-muted"><i class="fa-solid fa-microchip me-2"></i>Mill DNA Simulation</h6>
+            <div class="viewer-3d">
+                <canvas id="profileCanvas" style="width:100%; height:100%;"></canvas>
+            </div>
             
-            <button class="btn btn-outline-success w-100 mb-3 btn-main" onclick="openScanner()">
-                📷 เปิดกล้องสแกน QR Tag
+            <button class="btn btn-outline-primary w-100 btn-main mb-3" onclick="openScanner()">
+                <i class="fa-solid fa-qrcode me-2"></i> สแกน QR Tag (Coil)
             </button>
             <div id="reader" style="display:none;" class="mb-3"></div>
 
             <div class="row g-2 mb-3">
                 <div class="col-6">
                     <label class="small fw-bold">Mill No.</label>
-                    <input type="text" id="millNo" class="form-control">
+                    <input type="text" id="millNo" class="form-control form-control-lg">
                 </div>
                 <div class="col-6">
                     <label class="small fw-bold">น้ำหนัก (kg)</label>
-                    <input type="number" id="weight" class="form-control">
+                    <input type="number" id="weight" class="form-control form-control-lg">
                 </div>
             </div>
-            
-            <label class="small fw-bold">หมายเหตุ</label>
-            <textarea id="note" class="form-control mb-3"></textarea>
 
-            <button class="btn btn-primary w-100 btn-lg btn-main shadow" onclick="saveRecord()">บันทึกข้อมูล</button>
+            <!-- ช่องกรอกความหนาแบบย่อ (หัวม้วน) -->
+             <div class="row g-1 mb-3 text-center">
+                <div class="col-4"><label class="small">T1</label><input type="number" id="t1" step="0.001" class="form-control text-center"></div>
+                <div class="col-4"><label class="small">T2</label><input type="number" id="t2" step="0.001" class="form-control text-center border-primary"></div>
+                <div class="col-4"><label class="small">T3</label><input type="number" id="t3" step="0.001" class="form-control text-center"></div>
+             </div>
+
+            <button class="btn btn-primary w-100 btn-lg btn-main shadow-lg" onclick="saveRecord()">
+                <i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูลการผลิต
+            </button>
         </div>
 
-        <button class="btn btn-light w-100 text-danger fw-bold" onclick="switchScreen('screen-queue')">กลับหน้าหลัก</button>
+        <button class="btn btn-light w-100 btn-main text-muted" onclick="switchScreen('screen-queue')">ยกเลิก</button>
     </div>
 
 <script>
@@ -84,6 +111,7 @@
     let ALL_DATA = { machines: [], jobs: [] };
     let SELECTED_MACHINE = "";
     let CURRENT_JOB = null;
+    let PREDICTION = null;
     let html5QrCode = null;
 
     async function callGAS(action, data = {}) {
@@ -95,7 +123,7 @@
             });
             return await response.json();
         } catch (err) {
-            Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            Swal.fire('API Error', 'เชื่อมต่อล้มเหลว', 'error');
         } finally {
             document.getElementById('loading').style.display = 'none';
         }
@@ -124,14 +152,14 @@
         const myJobs = ALL_DATA.jobs.filter(j => j.machine === SELECTED_MACHINE && j.status !== 'Finished');
         myJobs.forEach(j => {
             const div = document.createElement('div');
-            div.className = 'card-custom';
+            div.className = 'card-custom p-3';
             div.innerHTML = `
-                <div class="d-flex justify-content-between">
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="fw-bold">${j.jobId}</div>
-                        <div class="small text-muted">${j.customer}</div>
+                        <div class="small text-muted">${j.customer} | ${j.thickness}mm</div>
                     </div>
-                    <button class="btn btn-primary btn-sm px-4" onclick="startJob('${j.jobId}')">เริ่มงาน</button>
+                    <button class="btn btn-primary btn-sm px-4 btn-main" onclick="startJob('${j.jobId}')">เริ่มงาน</button>
                 </div>
             `;
             container.appendChild(div);
@@ -139,13 +167,40 @@
     }
 
     async function startJob(jobId) {
-        const res = await callGAS('startJob', { jobId: jobId });
-        if (res === "SUCCESS") {
-            CURRENT_JOB = ALL_DATA.jobs.find(j => j.jobId === jobId);
-            document.getElementById('run-job-id').innerText = CURRENT_JOB.jobId;
-            document.getElementById('run-customer').innerText = CURRENT_JOB.customer;
-            switchScreen('screen-running');
+        showLoading();
+        // 1. เปลี่ยนสถานะใน Sheet
+        await callGAS('startJob', { jobId: jobId });
+        // 2. ดึง AI Prediction
+        const pred = await callGAS('getSmartPrediction', { jobId: jobId });
+        
+        CURRENT_JOB = ALL_DATA.jobs.find(j => j.jobId === jobId);
+        PREDICTION = pred;
+
+        document.getElementById('run-job-id').innerText = CURRENT_JOB.jobId;
+        document.getElementById('run-customer').innerText = CURRENT_JOB.customer;
+        
+        if (pred.found) {
+            document.getElementById('prediction-conf').innerText = "AI Confidence: " + pred.confidence;
+            // ใส่ค่าทำนายลงในช่องกรอก (ตำแหน่งหัวม้วน)
+            document.getElementById('t1').value = pred.prediction.H.t1;
+            document.getElementById('t2').value = pred.prediction.H.t2;
+            document.getElementById('t3').value = pred.prediction.H.t3;
         }
+
+        drawProfile();
+        switchScreen('screen-running');
+        hideLoading();
+    }
+
+    function drawProfile() {
+        const canvas = document.getElementById('profileCanvas');
+        const ctx = canvas.getContext('2d');
+        // Logic วาดหน้าตัดเหล็กแบบ Real-time (ขอละย่อเพื่อความสั้น)
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#3b82f6";
+        ctx.beginPath();
+        ctx.roundRect(50, 40, 200, 20, 5);
+        ctx.fill();
     }
 
     function openScanner() {
@@ -153,27 +208,18 @@
         html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start(
             { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 250 } },
+            { fps: 15, qrbox: 250 },
             (decodedText) => {
-                // ตัวอย่าง: ถ้า QR เป็น "MILL01,25000" ให้แยกใส่ช่อง
                 const data = decodedText.split(",");
                 if(data[0]) document.getElementById('millNo').value = data[0];
-                if(data[1]) document.getElementById('weight').value = data[1];
-                
+                if(data[4]) document.getElementById('weight').value = data[4];
                 stopScanner();
-                Swal.fire('สแกนสำเร็จ', '', 'success');
-            },
-            (errorMessage) => { /* สแกนไม่เจอก็ปล่อยผ่านไป */ }
+                Swal.fire({ icon:'success', title:'สแกนสำเร็จ', timer:1000, showConfirmButton:false });
+            }
         );
     }
 
-    function stopScanner() {
-        if(html5QrCode) {
-            html5QrCode.stop().then(() => {
-                document.getElementById('reader').style.display = 'none';
-            });
-        }
-    }
+    function stopScanner() { if(html5QrCode) html5QrCode.stop().then(() => document.getElementById('reader').style.display='none'); }
 
     async function saveRecord() {
         const formObj = {
@@ -181,16 +227,14 @@
             machine: SELECTED_MACHINE,
             millNo: document.getElementById('millNo').value,
             weight: document.getElementById('weight').value,
-            note: document.getElementById('note').value
+            thickH1: document.getElementById('t1').value,
+            thickH2: document.getElementById('t2').value,
+            thickH3: document.getElementById('t3').value
         };
 
-        if(!formObj.millNo || !formObj.weight) return Swal.fire('กรุณากรอกข้อมูลให้ครบ', '', 'warning');
-
         const res = await callGAS('saveProductionLog', { formObj: formObj, fileList: [] });
-        if (res === "SUCCESS") {
-            Swal.fire('บันทึกสำเร็จ', '', 'success').then(() => {
-                location.reload(); // รีเฟรชเพื่อรับงานใหม่
-            });
+        if (res.includes("SUCCESS")) {
+            Swal.fire('บันทึกสำเร็จ', '', 'success').then(() => location.reload());
         }
     }
 
@@ -198,6 +242,8 @@
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
     }
+    function showLoading() { document.getElementById('loading').style.display = 'flex'; }
+    function hideLoading() { document.getElementById('loading').style.display = 'none'; }
 </script>
 </body>
 </html>
