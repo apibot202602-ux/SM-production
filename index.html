@@ -2577,12 +2577,12 @@ function updateLegendDisplay(index, log) {
                     showLoading();
                     callGAS('startJob', [id], () => {
                         // อัปเดตสถานะในตัวแปร LOCAL ด้วย
-                        let job = ALL_DATA.jobs.find(j => j.jobId === id], null, null);
+                        let job = ALL_DATA.jobs.find(j => j.jobId === id);  // BUG FIX: แก้ ] ผิดที่ + ลบ args เกิน
                         if(job) job.status = 'Running';
                         
-                        setupRunning(job); // เข้าหน้าผลิต
+                        setupRunning(job);
                         hideLoading();
-                    }).startJob(id);
+                    });  // BUG FIX: ลบ .startJob(id) chained call ออก
                 }
             });
         }
@@ -2672,12 +2672,11 @@ function updateLegendDisplay(index, log) {
                     console.error("เกิดข้อผิดพลาดในการสร้างรายการประวัติ:", err);
                     cont.innerHTML = '<div class="text-center text-danger py-3 small">เกิดข้อผิดพลาดในการแสดงผลประวัติ</div>';
                 }
-            })
-            .withFailureHandler(err => {
-                console.error("หลังบ้านพัง Error:", err.message);
-                alert("หลังบ้าน Error: " + err.message);                
-            })
-            .getJobLogs(cleanJobId);
+            }, err => {
+                // BUG FIX: migrate จาก google.script.run มาใช้ callGAS error handler
+                console.error("หลังบ้านพัง Error:", err);
+                cont.innerHTML = '<div class="text-center text-danger py-3 small">โหลดประวัติไม่สำเร็จ กรุณาลองใหม่</div>';
+            });
         }
         
         function validateQC(input) {
@@ -3062,10 +3061,11 @@ function updateLegendDisplay(index, log) {
                 renderMobileDash(data);
                 
                 hideLoading();
-            }).withFailureHandler(err => {
+            }, err => {
+                // BUG FIX: migrate จาก google.script.run มาใช้ callGAS error handler
                 hideLoading();
-                Swal.fire("Error", err.message, "error");
-            }).getDashboardOverview(filterDate, filterDateEnd); 
+                Swal.fire("Error", err || "โหลด Dashboard ไม่สำเร็จ", "error");
+            });
         }
         // เพิ่มฟังก์ชันสำหรับปุ่ม Clear Filter
         function clearMonitorFilter() {
@@ -3178,7 +3178,7 @@ function updateLegendDisplay(index, log) {
                 }
 
                 hideLoading();
-            }).getExecutiveData(filterObj);
+            });  // BUG FIX: ลบ .getExecutiveData() old-API ออก (callGAS ใช้อยู่แล้ว)
         }
 
         function renderMainCharts(data) {
@@ -3379,7 +3379,7 @@ function updateLegendDisplay(index, log) {
                 });
                 cont.innerHTML = finalHtml;
                 if (logs.length > 0) setTimeout(function() { if(typeof load3DSpecific === "function") load3DSpecific(0); }, 500);
-            }).getJobLogs(jobId);
+            });  // BUG FIX: ลบ .getJobLogs() old-API ออก (callGAS ใช้อยู่แล้ว)
         }
         
         function showLoading() { document.getElementById('loading').style.display='flex'; }
@@ -3453,7 +3453,7 @@ function updateLegendDisplay(index, log) {
                     } else {
                         Swal.fire("Error", res, "error");
                     }
-                }).addNewJob(fd, filePayload); // <--- เปลี่ยนจาก null เป็น filePayload
+                });  // BUG FIX: ลบ .addNewJob() old-API ออก (callGAS ใช้อยู่แล้ว)
             }
         };
 
@@ -3616,7 +3616,7 @@ function updateLegendDisplay(index, log) {
                     hideLoading();
                 }, null);
                 
-            }).saveDailyPlan(planList);
+            });  // BUG FIX: ลบ .saveDailyPlan(planList) chained call ออก
         }
 
         function exportToExcel() {
@@ -3663,7 +3663,7 @@ function updateLegendDisplay(index, log) {
                 const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
                 Toast.fire({ icon: 'success', title: 'Export เรียบร้อย!' });
 
-            }).getLogsForExport(sDate, eDate);
+            });  // BUG FIX: ลบ .getLogsForExport() old-API ออก (callGAS ใช้อยู่แล้ว)
         }
 
         // 1. ฟังก์ชันก๊อปปี้ข้อมูล (แบบรวมศูนย์)
@@ -3855,7 +3855,7 @@ function updateLegendDisplay(index, log) {
                         }
                     }
                 });
-            }).getAdvancedTrendData(filterObj);
+            });  // BUG FIX: ลบ .getAdvancedTrendData() old-API ออก (callGAS ใช้อยู่แล้ว)
         }
 
         function updateTrendStats(result) {
@@ -4497,11 +4497,11 @@ function updateLegendDisplay(index, log) {
                     showLoading();
                     callGAS('pauseJob', [id], () => {
                         // อัปเดตข้อมูลในเครื่องแบบเร็ว (ไม่ต้องโหลดใหม่หมด)
-                        const job = ALL_DATA.jobs.find(j => j.jobId === id], null, null);
+                        const job = ALL_DATA.jobs.find(j => j.jobId === id);  // BUG FIX: แก้ ] ผิดที่ + ลบ args เกิน
                         if(job) job.status = 'Waiting';
                         setupQueue();
                         hideLoading();
-                    }).pauseJob(id);
+                    });  // BUG FIX: ลบ .pauseJob(id) chained call ออก
                 }
             });
         }
@@ -4561,29 +4561,20 @@ function updateLegendDisplay(index, log) {
             const formData = new FormData(formElement); // ต้องมีบรรทัดนี้
             formData.forEach((v, k) => fd[k] = v);
             
-            callGAS('updateRecord', [fd], res => {
+            // BUG FIX: ลบโค้ดซ้ำและ .withFailureHandler().updateJobData() ออก
+            //          (หลงมาจาก google.script.run API เก่าก่อน migrate มาใช้ callGAS)
+            callGAS('updateJobData', [fd], res => {
                 btn.disabled = false;
                 btn.innerText = "บันทึกการแก้ไขข้อมูล";
-                
-                if(res === "SUCCESS") {
+
+                if (res === 'SUCCESS') {
                     Swal.fire({ icon: 'success', title: 'แก้ไขสำเร็จ', timer: 2000, showConfirmButton: false });
                     bootstrap.Modal.getInstance(document.getElementById('modal-add-job')).hide();
-                    refreshAllData(() => { setupQueue(); }); 
+                    refreshAllData(() => { setupQueue(); });
                 } else {
-                    Swal.fire("เกิดข้อผิดพลาด", res, "error");
+                    Swal.fire("เกิดข้อผิดพลาด", res || 'ไม่ทราบสาเหตุ', "error");
                 }
-              }, null);
-                    refreshAllData(() => { setupQueue(); }); 
-                } else {
-                    Swal.fire("เกิดข้อผิดพลาด", res, "error");
-                }
-              })
-              .withFailureHandler(err => {
-                  btn.disabled = false;
-                  btn.innerText = "บันทึกการแก้ไขข้อมูล";
-                  Swal.fire("Error", err.message, "error");
-              })
-              .updateJobData(fd); // ส่ง Object ไปที่ Server
+            });
         }
 
         function refreshAllData(callback) {
@@ -5512,7 +5503,7 @@ function updateLegendDisplay(index, log) {
                         } else {
                             Swal.fire('Error', res, 'error');
                         }
-                    }).syncSlitIdentities(log.jobId, finalPayload);
+                    });  // BUG FIX: ลบ .syncSlitIdentities chained call ออก
                 }
             });
         }
@@ -5536,7 +5527,7 @@ function updateLegendDisplay(index, log) {
                         renderKnifeLines(index, document.getElementById(`knife-container-${index}`)); 
                         applySlitting(index, ""); 
                         Swal.fire('ล้างข้อมูลสำเร็จ', 'วางใบมีดใหม่ได้เลยครับ', 'success');
-                    }).syncSlitIdentities(log.jobId, []); 
+                    });  // BUG FIX: ลบ .syncSlitIdentities chained call ออก 
                 }
             });
         }
