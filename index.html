@@ -23,12 +23,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;700&display=swap" rel="stylesheet">
     
     <style>
+        /* BUG FIX #5: รวม :root ทั้งหมดไว้ที่เดียว
+           เดิมมี 2 บล็อก — บล็อกที่ 2 override --primary-color ทำให้สีเพี้ยนโดยไม่รู้ตัว */
         :root {
-          --primary-color: #4361ee;
+          --primary-color:    #4361ee;
           --primary-gradient: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
-          --bg-color: #f8fafc;
-          --card-radius: 16px; /* ลดความโค้งลงนิดนึงให้ดู Modern */
-          --shadow-soft: 0 4px 20px -5px rgba(0, 0, 0, 0.08);
+          --bg-color:         #f8fafc;
+          --card-radius:      16px;
+          --shadow-soft:      0 4px 20px -5px rgba(0, 0, 0, 0.08);
+          --success-color:    #10b981;
+          --warning-color:    #f59e0b;
+          --danger-color:     #ef4444;
         }
         body { background-color: var(--bg-color); font-family: 'Sarabun', sans-serif; color: #1e293b; font-size: 14px; overflow-x: hidden; }
 
@@ -50,7 +55,7 @@
         .btn-main:active { transform: scale(0.98); }
 
         .form-control, .form-select { border-radius: 10px; border: 1px solid #e2e8f0; background-color: #f8fafc; padding: 8px 12px; font-size: 0.9rem; }
-        .form-control:focus { background-color: white; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.1); }
+        /* BUG FIX #5: ลบ .form-control:focus ซ้ำออก — รวมไว้ที่เดียวด้านล่างแล้ว */
         
         /* Log Item Compact */
         .log-item { background: white; border-radius: 12px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; cursor: pointer; }
@@ -204,12 +209,7 @@
         }
 
         /* 1. High Contrast & Status Pulse */
-        :root {
-          --primary-color: #2563eb;
-          --success-color: #10b981;
-          --warning-color: #f59e0b;
-          --danger-color: #ef4444;
-        }
+        /* BUG FIX #5: ลบ :root บล็อกที่ 2 ออก — รวมไว้ที่บล็อกแรกด้านบนแล้ว */
 
         /* ปุ่มใหญ่สะใจ (Fitts's Law) */
         .btn-lg-xl {
@@ -238,11 +238,7 @@
         }
 
         /* ปรับแต่ง Input ให้ดูเป็นมืออาชีพ */
-        .form-control:focus {
-          border-color: var(--primary-color);
-          box-shadow: 0 0 0 0.25 darkblue;
-          background-color: #fff !important;
-        }
+        /* BUG FIX #5: ลบ .form-control:focus ซ้ำออก — รวมไว้ที่เดียวด้านล่างแล้ว */
 
         /* Toast Notification (แจ้งเตือนเล็กๆ) */
         #toast-container {
@@ -266,10 +262,14 @@
           display: flex;
           align-items: center;
         }
-        /* สไตล์สำหรับช่อง Input ที่กำลังพิมพ์ (Highlight) */
+        /* BUG FIX #5: รวม .form-control:focus ทั้งหมดไว้ที่เดียว
+           เดิมมี 3 บล็อก — บล็อก 2 มีค่าผิด (0.25 ไม่มี unit, darkblue ไม่ใช่ rgba)
+           บล็อก 3 มี !important ชนะทุกอัน แต่ขาด box-shadow */
         .form-control:focus {
-          border: 2px solid #2563eb !important;
+          border: 2px solid var(--primary-color) !important;
           background-color: #f0f7ff !important;
+          box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15) !important;
+          outline: none;
         }
 
         .history-card {
@@ -4458,11 +4458,17 @@ function updateLegendDisplay(index, log) {
             }).then((result) => {
                 if (result.isConfirmed) {
                     showLoading();
+                    // BUG FIX #3: เดิมมี .clearSandboxLogs() ต่อท้าย callback
+                    //              ซึ่งเป็น syntax ผิด — เรียกซ้ำบน return value ที่ไม่มีฟังก์ชันนั้น
                     callGAS('clearSandboxLogs', [], res => {
                         hideLoading();
+                        if (res && res.toString().startsWith('ERROR')) {
+                            Swal.fire('เกิดข้อผิดพลาด!', res, 'error');
+                            return;
+                        }
                         Swal.fire('สำเร็จ!', 'ล้างข้อมูล Sandbox เรียบร้อยแล้ว', 'success');
-                        if (CURRENT_JOB_INFO) loadHistory(CURRENT_JOB_INFO.jobId); // รีโหลดประวัติ
-                    }).clearSandboxLogs();
+                        if (CURRENT_JOB_INFO) loadHistory(CURRENT_JOB_INFO.jobId);
+                    });
                 }
             });
         }
@@ -5227,14 +5233,16 @@ function updateLegendDisplay(index, log) {
             }).then((result) => {
                 if (result.isConfirmed) {
                     showLoading();
+                    // BUG FIX #4: เดิมมี .saveSlitIdentity(slitPayload) ต่อท้าย callback
+                    //              ซึ่งเป็น syntax ผิด — เรียกซ้ำบน return value ที่ไม่มีฟังก์ชันนั้น
                     callGAS('saveSlitIdentity', [payload], res => {
                         hideLoading();
-                        if(res === "SUCCESS") {
+                        if (res === 'SUCCESS') {
                             Swal.fire('สำเร็จ!', 'บันทึกม้วนลูกเข้าคลังเรียบร้อยแล้ว', 'success');
                         } else {
-                            Swal.fire('Error', res, 'error');
+                            Swal.fire('Error', res || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ', 'error');
                         }
-                    }).saveSlitIdentity(slitPayload);
+                    });
                 }
             });
         }
