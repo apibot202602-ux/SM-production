@@ -3578,6 +3578,7 @@ function updateLegendDisplay(index, log) {
             document.getElementById('sum-daily-target').innerText = sum;
         }
         
+        // BUG FIX: ล้างโค้ดซ้ำ + }) เกินที่เกิดจากการ migrate ครั้งก่อน
         function saveDailyPlan() {
             const planList = [];
             document.querySelectorAll('.plan-input').forEach(inp => {
@@ -3586,37 +3587,31 @@ function updateLegendDisplay(index, log) {
                     target: parseInt(inp.value) || 0
                 });
             });
-            
-            // Show Loading
+
             const btn = document.querySelector('#modal-daily-plan .btn-primary');
             const oldText = btn.innerText;
-            btn.disabled = true; btn.innerText = "Saving...";
-            
-            callGAS('saveDailyPlan', [planPayload], res => {
-                btn.disabled = false; btn.innerText = oldText;
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            callGAS('saveDailyPlan', [planList], res => {
+                btn.disabled = false;
+                btn.innerText = oldText;
+
+                if (res !== 'SUCCESS') {
+                    Swal.fire('เกิดข้อผิดพลาด', res || 'ไม่ทราบสาเหตุ', 'error');
+                    return;
+                }
+
                 bootstrap.Modal.getInstance(document.getElementById('modal-daily-plan')).hide();
-                
-                // Reload Data
+
                 showLoading();
                 callGAS('getInitialData', [], data => {
                     ALL_DATA = data;
                     const rJob = ALL_DATA.jobs.find(j => j.machine === CURRENT_MACHINE && j.status === 'Running');
                     rJob ? setupRunning(rJob) : setupQueue();
                     hideLoading();
-                }, null);
-                
-            }, null);
-                
-                // Reload Data
-                showLoading();
-                callGAS('getInitialData', [], data => {
-                    ALL_DATA = data;
-                    const rJob = ALL_DATA.jobs.find(j => j.machine === CURRENT_MACHINE && j.status === 'Running');
-                    rJob ? setupRunning(rJob) : setupQueue();
-                    hideLoading();
-                }, null);
-                
-            });  // BUG FIX: ลบ .saveDailyPlan(planList) chained call ออก
+                });
+            });
         }
 
         function exportToExcel() {
