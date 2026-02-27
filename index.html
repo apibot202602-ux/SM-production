@@ -2965,8 +2965,14 @@ function updateLegendDisplay(index, log) {
 
         function showDashboard(isAuto = false) { 
             if(!isAuto) showLoading(); 
-            
-            const today = new Date().toISOString().split('T')[0];
+
+            // BUG FIX: เดิมใช้ toISOString() ซึ่งเป็น UTC → ในไทย (UTC+7) อาจได้วันผิด
+            // แก้: ใช้ local date โดยตรง
+            const now   = new Date();
+            const today = now.getFullYear() + '-' +
+                          String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                          String(now.getDate()).padStart(2, '0');
+
             const startPicker = document.getElementById('monitor-date-start');
             const endPicker = document.getElementById('monitor-date-end');
             const filterDate = startPicker?.value || today;
@@ -3146,6 +3152,13 @@ function updateLegendDisplay(index, log) {
             };
 
             callGAS('getDashboardLogs', [filterObj], data => {
+                // BUG FIX: ป้องกัน crash ถ้า data หรือ data.kpi เป็น undefined
+                if (!data || !data.kpi) {
+                    hideLoading();
+                    Swal.fire('ข้อผิดพลาด', 'โหลดข้อมูล Analytics ไม่สำเร็จ กรุณาลองใหม่', 'error');
+                    return;
+                }
+
                 // บันทึกข้อมูลเข้าตัวแปรส่วนกลาง
                 DASHBOARD_LOGS = data.logs || [];
                 ALL_TIMELINE_DATA = data.timeline || [];
