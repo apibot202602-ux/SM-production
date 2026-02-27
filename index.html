@@ -2597,20 +2597,29 @@ function updateLegendDisplay(index, log) {
           CURRENT_JOB_STD = null;
           if (ALL_DATA.standards) {
               // 1. ระบุชื่อคอลัมน์ที่จะค้นหาตามชื่อ Mill (แปลงเป็นตัวเล็ก sa, gj, gs, bsp)
-              const millKey = String(job.millPlan).toLowerCase().trim(); 
+              // BUG FIX: millKey ต้อง map ไปยัง key จริงใน standards object
+              //          Backend ส่ง keys เป็น lowercase: sa, gj, gs, bsp
+              //          millPlan อาจมาเป็น "SA", "sa", "SA1", "GS-2" ต้องทำ normalization
+              const rawMill  = String(job.millPlan).toLowerCase().trim();
+              // normalize: ตัด suffix ตัวเลขออก เช่น "sa1" → "sa", "gs-2" → "gs"
+              const millKey  = rawMill.replace(/[-_]?\d+$/, '');
+              // valid keys ใน standards
+              const VALID_MILL_KEYS = ['sa', 'gj', 'gs', 'bsp'];
+              const resolvedKey = VALID_MILL_KEYS.includes(millKey) ? millKey : null;
 
               const matchStd = ALL_DATA.standards.find(s => {
-                  // เช็คประเภทท่อก่อน
                   const isTypeMatch = String(s.type).trim() === String(job.workType).trim();
-                  
-                  // เช็คความหนา โดยเลือกคอลัมน์ตาม Mill (เช่น ถ้า millKey คือ 'gs' ก็จะไปเช็คค่าใน s.gs)
+
                   let isThickMatch = false;
-                  if (s[millKey] !== undefined) {
-                      // เทียบค่าความหนาในคอลัมน์ Mill นั้นๆ กับค่าความหนาของ Job
-                      isThickMatch = parseFloat(s[millKey]).toFixed(2) === parseFloat(job.thickness).toFixed(2);
+                  if (resolvedKey && s[resolvedKey] !== undefined && s[resolvedKey] !== '' && s[resolvedKey] !== '-') {
+                      // เทียบความหนาในคอลัมน์ Mill ที่ระบุ
+                      isThickMatch = parseFloat(s[resolvedKey]).toFixed(2) === parseFloat(job.thickness).toFixed(2);
                   } else {
-                      // ถ้าชื่อ Mill ไม่ตรงกับคอลัมน์ที่มี (SA,GJ,GS,BSP) ให้กลับไปเช็คคอลัมน์ B (thick) ปกติ
-                      isThickMatch = parseFloat(s.thick).toFixed(2) === parseFloat(job.thickness).toFixed(2);
+                      // fallback: ถ้า Mill ไม่ตรง VALID_MILL_KEYS ให้เช็คทุกคอลัมน์
+                      isThickMatch = VALID_MILL_KEYS.some(k =>
+                          s[k] !== undefined && s[k] !== '' && s[k] !== '-' &&
+                          parseFloat(s[k]).toFixed(2) === parseFloat(job.thickness).toFixed(2)
+                      ) || parseFloat(s.thick).toFixed(2) === parseFloat(job.thickness).toFixed(2);
                   }
 
                   return isTypeMatch && isThickMatch;
@@ -3164,17 +3173,20 @@ function updateLegendDisplay(index, log) {
                 // 4. อัปเดตตาราง Recent Logs
                 const tbody = document.getElementById('dash-table-body');
                 if (tbody) {
-                    tbody.innerHTML = data.logs.map((row, index) => {
-                        const statusBadge = row.isFail ? '<span class="badge bg-danger">Alert</span>' : '<span class="badge bg-success bg-opacity-10 text-success">OK</span>';
+                    // BUG FIX: ลบ err => {} ออก — argument ที่ 2 ของ .map() คือ thisArg ไม่ใช่ error handler
+                    tbody.innerHTML = (data.logs || []).map((row, index) => {
+                        const statusBadge = row.isFail
+                            ? '<span class="badge bg-danger">Alert</span>'
+                            : '<span class="badge bg-success bg-opacity-10 text-success">OK</span>';
                         return `<tr onclick="showDashboardLogDetail(${index})" style="cursor:pointer;" class="align-middle">
-                            <td class="text-muted small">${row.time}</td>
-                            <td class="fw-bold">${row.machine}</td>
-                            <td class="text-primary fw-bold">${row.job}</td>
-                            <td><span class="badge bg-light text-dark border">${row.coil}</span></td>
-                            <td class="fw-bold text-end">${row.weight.toLocaleString()}</td>
+                            <td class="text-muted small">${row.time || '-'}</td>
+                            <td class="fw-bold">${row.machine || '-'}</td>
+                            <td class="text-primary fw-bold">${row.job || '-'}</td>
+                            <td><span class="badge bg-light text-dark border">${row.coil || '-'}</span></td>
+                            <td class="fw-bold text-end">${(row.weight || 0).toLocaleString()}</td>
                             <td class="text-center">${statusBadge}</td>
                         </tr>`;
-                    }, err => { hideLoading(); Swal.fire("Error", err.message, "error"); });
+                    }).join('');
                 }
 
                 hideLoading();
