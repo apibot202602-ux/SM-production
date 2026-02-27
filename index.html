@@ -35,7 +35,7 @@
           --warning-color:    #f59e0b;
           --danger-color:     #ef4444;
         }
-        body { background-color: var(--bg-color); font-family: 'Sarabun', sans-serif; color: #1e293b; font-size: 14px; overflow-x: hidden; }
+        body { background-color: var(--bg-color); font-family: 'Sarabun', sans-serif; color: #1e293b; font-size: 14px; overflow-x: hidden; padding-bottom: 16px; }
 
         /* Desktop: centered container */
         .container { max-width: 800px; padding-top: 15px; padding-bottom: 80px; padding-left: 16px; padding-right: 16px; }
@@ -853,10 +853,6 @@
             .hist-order-meta     { order: 4; }
             .hist-order-actions  { order: 5; }
         }
-
-
-        
-            #mobile-bottom-nav  { display: none !important; }
         }
 
         /* ================================================================
@@ -873,54 +869,8 @@
         ================================================================ */
 
         /* Bottom Nav */
-        #mobile-bottom-nav {
-            display: none;
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #fff;
-            border-top: 1px solid #e2e8f0;
-            z-index: 1000;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-            padding-bottom: env(safe-area-inset-bottom);
-        }
-        .mob-nav-btn {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 10px 4px 8px;
-            border: none;
-            background: transparent;
-            color: #94a3b8;
-            font-size: 0.65rem;
-            font-weight: 600;
-            gap: 3px;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-            transition: color 0.15s;
-            min-height: 56px;
-        }
-        .mob-nav-btn i { font-size: 1.3rem; }
-        .mob-nav-btn.active { color: #4361ee; }
-        .mob-nav-btn.record-btn {
-            color: #fff !important;
-            background: linear-gradient(135deg, #4361ee, #3a0ca3);
-            border-radius: 14px;
-            margin: 6px 3px;
-            padding: 6px 8px;
-            box-shadow: 0 4px 14px rgba(67,97,238,0.4);
-            min-height: 44px;
-            font-size: 0.7rem;
-        }
 
-        /* Mobile Dashboard */
-        .mob-topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4px 0 12px;
-        }
+        /* Mobile Dashboard - Top bar removed */
         .mob-stat-bar {
             display: grid;
             grid-template-columns: repeat(3,1fr);
@@ -1110,7 +1060,6 @@
             #mobile-dash { display: none !important; }
 
             /* 8. Bottom nav */
-            #mobile-bottom-nav { display: flex !important; }
 
             /* 9. History card order */
             .hist-card-right { display: flex !important; flex-direction: column; }
@@ -1124,7 +1073,6 @@
         /* Desktop: hide mobile-only */
         @media (min-width: 1025px) {
             #mobile-dash        { display: none !important; }
-            #mobile-bottom-nav  { display: none !important; }
         }
 
         /* Landscape phone: compact */
@@ -1139,7 +1087,6 @@
             #run-btn-record .fa-pen-to-square { font-size: 1.4rem !important; margin-bottom: 0 !important; }
             #run-btn-record .fs-3 { font-size: 1rem !important; }
             #run-btn-record small { display: none; }
-            .mob-nav-btn { min-height: 44px; padding: 5px 4px; font-size: 0.6rem; }
         }
 
     </style>
@@ -1325,20 +1272,7 @@
         <!-- MOBILE APP VIEW (แสดงเฉพาะบน mobile ≤700px) -->
         <div id="mobile-dash" style="display:none;">
           <!-- Top bar -->
-          <div class="mob-topbar">
-            <div>
-              <div class="fw-bold" style="font-size:1.1rem;">Machine Monitor</div>
-              <div class="text-muted" style="font-size:0.72rem;" id="mob-last-update">-</div>
-            </div>
-            <div class="d-flex gap-2">
-              <button onclick="showExecDashboard()" class="btn btn-sm btn-light border shadow-sm rounded-pill px-3">
-                <i class="fa-solid fa-chart-pie text-primary me-1"></i> Analytics
-              </button>
-              <button onclick="goHome()" class="btn btn-sm btn-light border shadow-sm rounded-circle" style="width:34px;height:34px;">
-                <i class="fa-solid fa-xmark text-muted"></i>
-              </button>
-            </div>
-          </div>
+          <!-- Top Nav ถูกลบออกตาม request -->
 
           <!-- Stat summary -->
           <div class="mob-stat-bar" id="mob-stat-bar">
@@ -1363,28 +1297,7 @@
       </div>
 
       <!-- MOBILE BOTTOM NAV (global, fixed) -->
-      <div id="mobile-bottom-nav" style="display:none;">
-        <button class="mob-nav-btn" id="mob-nav-home" onclick="goHome()">
-          <i class="fa-solid fa-house"></i>
-          <span>หน้าหลัก</span>
-        </button>
-        <button class="mob-nav-btn" id="mob-nav-monitor" onclick="showDashboard()">
-          <i class="fa-solid fa-gauge-high"></i>
-          <span>Monitor</span>
-        </button>
-        <button class="mob-nav-btn record-btn" id="mob-nav-record" style="display:none;" onclick="openRecordModal(false)">
-          <i class="fa-solid fa-pen-to-square"></i>
-          <span>บันทึก</span>
-        </button>
-        <button class="mob-nav-btn" id="mob-nav-queue" onclick="setupQueue()">
-          <i class="fa-solid fa-list-check"></i>
-          <span>Queue</span>
-        </button>
-        <button class="mob-nav-btn" id="mob-nav-analytics" onclick="showExecDashboard()">
-          <i class="fa-solid fa-chart-pie"></i>
-          <span>Analytics</span>
-        </button>
-      </div>
+      <!-- Bottom Nav ถูกลบออกตาม request -->
 
       <!-- SCREEN 5: EXECUTIVE DASHBOARD (Analytics) -->
       <div id="screen-dashboard-exec" class="screen">
@@ -2333,12 +2246,21 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" crossorigin="anonymous"></script>
+    <!-- Chart.js: ใช้ version ที่ pin ไว้ชัดเจน + crossorigin เพื่อแก้ Tracking Prevention -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" crossorigin="anonymous"></script>
+    <script>
+      // Guard: ถ้า Chart.js โหลดไม่สำเร็จ แจ้งเตือนแทน crash เงียบๆ
+      window.addEventListener('load', function() {
+        if (typeof Chart === 'undefined') {
+          console.warn('Chart.js ไม่โหลด — กราฟจะไม่แสดงผล กรุณา refresh หรือตรวจสอบการเชื่อมต่อ');
+        }
+      });
+    </script>
 
     <script>
 
@@ -2346,6 +2268,13 @@
       // ตั้งค่า URL ของ GAS Web App ที่นี่
       // ======================================================
       const GAS_URL = "https://script.google.com/macros/s/AKfycbwcZesY-cNsIkfIIBhFIh4l1GHUyIo3rEKXjv2V3qCa594wqG7pve06I7mRrn74taoZ/exec";
+
+      // Fix: aria-hidden บน focused element — blur ก่อน modal ซ่อน
+      document.addEventListener('hide.bs.modal', function(e) {
+        if (document.activeElement && e.target.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+      });
 
       // callGAS(action, args, successCb, failCb)
       // - action   : ชื่อ function ใน GAS เช่น 'getInitialData'
@@ -3787,7 +3716,7 @@ function updateLegendDisplay(index, log) {
 
             showLoading();
             
-            callGAS('getProductionTrend', [trendFilter], result => {
+            callGAS('getProductionTrend', [filterObj], result => {  // BUG FIX: trendFilter → filterObj
                 hideLoading();
                 
                 const points = result.points;
