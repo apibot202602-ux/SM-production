@@ -3797,12 +3797,11 @@ function updateLegendDisplay(index, log) {
                         scales: {
                             x: {
                                 ticks: {
-                                    // BUG FIX: Chart.js autoSkip ซ่อน label อัตโนมัติ ทำให้ดูเหมือนข้อมูลหาย
-                                    // แก้โดยให้แสดง label ทุก N จุด แทนการซ่อนแบบสุ่ม
-                                    autoSkip: true,
-                                    maxTicksLimit: 20,      // แสดงสูงสุด 20 label บนแกน X
-                                    maxRotation: 45,        // หมุน label 45 องศา ไม่ให้ชนกัน
-                                    minRotation: 30
+                                    // BUG FIX: autoSkip:false = แสดง label ทุก 45 จุด ไม่ซ่อน
+                                    autoSkip: false,
+                                    maxRotation: 60,
+                                    minRotation: 45,
+                                    font: { size: 9 }   // ตัวเล็กลงนิดเพื่อไม่ให้ชนกัน
                                 }
                             },
                             y: { 
