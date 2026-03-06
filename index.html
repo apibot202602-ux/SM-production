@@ -1089,7 +1089,46 @@
             #run-btn-record small { display: none; }
         }
 
-    </style>
+    
+        /* Normal Dist Fullscreen Overlay */
+        #nd-fullscreen-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        #nd-fullscreen-overlay.active { display: flex; }
+        #nd-fullscreen-inner {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 92vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        #nd-fullscreen-close {
+            position: absolute;
+            top: 10px; right: 14px;
+            background: none; border: none;
+            font-size: 1.5rem; cursor: pointer;
+            color: #666; line-height: 1;
+        }
+        #nd-fullscreen-close:hover { color: #000; }
+        .nd-card-clickable {
+            cursor: zoom-in;
+            transition: box-shadow 0.2s;
+        }
+        .nd-card-clickable:hover {
+            box-shadow: 0 0 0 2px #4361ee55 !important;
+        }
+</style>
   </head>
   <body>
 
@@ -1604,9 +1643,9 @@
 
                 <!-- H -->
                 <div class="col-12 col-md-6 col-xl-4">
-                  <div class="border rounded bg-white p-2 shadow-sm">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('H')" title="คลิกเพื่อขยาย">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#fd7e14;">ต้นม้วน (H)</div>
-                    <div style="height:160px;"><canvas id="ndBell-H"></canvas></div>
+                    <div style="height:160px;" onclick="openNdFullscreen('H')" title="คลิกเพื่อขยาย"><canvas id="ndBell-H"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-H"></canvas></div>
                     <!-- μ/σ stats -->
@@ -1616,9 +1655,9 @@
 
                 <!-- HM -->
                 <div class="col-12 col-md-6 col-xl-4">
-                  <div class="border rounded bg-white p-2 shadow-sm">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('HM')" title="คลิกเพื่อขยาย">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#ffc107;">30m แรก (HM)</div>
-                    <div style="height:160px;"><canvas id="ndBell-HM"></canvas></div>
+                    <div style="height:160px;" onclick="openNdFullscreen('HM')" title="คลิกเพื่อขยาย"><canvas id="ndBell-HM"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-HM"></canvas></div>
                     <!-- μ/σ stats -->
@@ -1628,9 +1667,9 @@
 
                 <!-- M -->
                 <div class="col-12 col-md-6 col-xl-4">
-                  <div class="border rounded bg-white p-2 shadow-sm">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('M')" title="คลิกเพื่อขยาย">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#4361ee;">กลางม้วน (M)</div>
-                    <div style="height:160px;"><canvas id="ndBell-M"></canvas></div>
+                    <div style="height:160px;" onclick="openNdFullscreen('M')" title="คลิกเพื่อขยาย"><canvas id="ndBell-M"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-M"></canvas></div>
                     <!-- μ/σ stats -->
@@ -1640,9 +1679,9 @@
 
                 <!-- MT -->
                 <div class="col-12 col-md-6 col-xl-4">
-                  <div class="border rounded bg-white p-2 shadow-sm">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('MT')" title="คลิกเพื่อขยาย">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#9b5de5;">30m ท้าย (MT)</div>
-                    <div style="height:160px;"><canvas id="ndBell-MT"></canvas></div>
+                    <div style="height:160px;" onclick="openNdFullscreen('MT')" title="คลิกเพื่อขยาย"><canvas id="ndBell-MT"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-MT"></canvas></div>
                     <!-- μ/σ stats -->
@@ -1652,9 +1691,9 @@
 
                 <!-- T -->
                 <div class="col-12 col-md-6 col-xl-4">
-                  <div class="border rounded bg-white p-2 shadow-sm">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('T')" title="คลิกเพื่อขยาย">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#d63384;">ท้ายม้วน (T)</div>
-                    <div style="height:160px;"><canvas id="ndBell-T"></canvas></div>
+                    <div style="height:160px;" onclick="openNdFullscreen('T')" title="คลิกเพื่อขยาย"><canvas id="ndBell-T"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-T"></canvas></div>
                     <!-- μ/σ stats -->
@@ -6331,9 +6370,192 @@ function updateLegendDisplay(index, log) {
             });
         }
 
+    
+        // ── ND Fullscreen ──────────────────────────────────────────────────────
+        let _ndFullBellInst = null, _ndFullScatInst = null;
+        let _ndLastPoints = null, _ndLastSpec = null;
+
+        // เก็บ points/spec ทุกครั้งที่ render
+        const _origRenderND = renderNormalDistCharts;
+        renderNormalDistCharts = function(points, spec) {
+            _ndLastPoints = points;
+            _ndLastSpec   = spec;
+            _origRenderND(points, spec);
+        };
+
+        const ND_META = {
+            H:  { keys:['tH1','tH2','tH3'],   label:'ต้นม้วน (H)',  color:'#fd7e14' },
+            HM: { keys:['tHM1','tHM2','tHM3'], label:'30m แรก (HM)', color:'#ffc107' },
+            M:  { keys:['tM1','tM2','tM3'],    label:'กลางม้วน (M)', color:'#4361ee' },
+            MT: { keys:['tMT1','tMT2','tMT3'], label:'30m ท้าย (MT)',color:'#9b5de5' },
+            T:  { keys:['tT1','tT2','tT3'],    label:'ท้ายม้วน (T)', color:'#d63384' }
+        };
+
+        function openNdFullscreen(posKey) {
+            if (!_ndLastPoints || _ndLastPoints.length === 0) return;
+
+            const meta   = ND_META[posKey];
+            const points = _ndLastPoints;
+            const spec   = _ndLastSpec;
+            const T_COLORS = { t1:'#3b82f6', t2:'#10b981', t3:'#f59e0b' };
+            const T_LABELS = { t1:'T1 ซ้าย', t2:'T2 กลาง', t3:'T3 ขวา' };
+            const tKeys    = ['t1','t2','t3'];
+
+            // แสดง overlay
+            document.getElementById('nd-fullscreen-title').innerHTML =
+                `<span style="color:${meta.color}">${meta.label}</span> &nbsp;—&nbsp; n=${points.length}`;
+            document.getElementById('nd-fullscreen-overlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            const rawMap = {}, statsMap = {};
+            tKeys.forEach((tk, i) => {
+                rawMap[tk]   = points.map(p => p[meta.keys[i]]).filter(v => v !== null && v > 0);
+                const arr    = rawMap[tk];
+                const n      = arr.length;
+                if (n < 2) { statsMap[tk] = null; return; }
+                const mean   = arr.reduce((a,b)=>a+b,0)/n;
+                const std    = Math.sqrt(arr.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/n);
+                statsMap[tk] = { mean, std, n };
+            });
+
+            const allVals = [...rawMap.t1,...rawMap.t2,...rawMap.t3];
+            if (!allVals.length) return;
+            const gMean = allVals.reduce((a,b)=>a+b,0)/allVals.length;
+            const gStd  = Math.sqrt(allVals.map(v=>(v-gMean)**2).reduce((a,b)=>a+b,0)/allVals.length);
+            const xMin  = Math.min(...allVals, spec&&spec.lsl?spec.lsl:Infinity) - gStd*0.5;
+            const xMax  = Math.max(...allVals, spec&&spec.usl?spec.usl:-Infinity) + gStd*0.5;
+            const xPts  = Array.from({length:300},(_,i)=>xMin+(xMax-xMin)*i/299);
+
+            function normPDF(x,mean,std){ return std===0?0:(1/(std*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*((x-mean)/std)**2); }
+
+            // ── Bell Chart ────────────────────────────────────────────────────
+            const bellDs = [];
+            tKeys.forEach(tk => {
+                const st = statsMap[tk];
+                if (!st) return;
+                bellDs.push({
+                    label: T_LABELS[tk],
+                    data: xPts.map(x=>({x,y:normPDF(x,st.mean,st.std)})),
+                    borderColor: T_COLORS[tk], backgroundColor: T_COLORS[tk]+'22',
+                    borderWidth:2.5, pointRadius:0, fill:true, tension:0.4
+                });
+                const yPeak = normPDF(st.mean,st.mean,st.std);
+                bellDs.push({
+                    label:'_mean_'+tk,
+                    data:[{x:st.mean,y:0},{x:st.mean,y:yPeak}],
+                    borderColor:T_COLORS[tk], borderDash:[5,4],
+                    borderWidth:1.5, pointRadius:0, fill:false, tension:0
+                });
+            });
+            if (spec&&spec.usl!==null) {
+                const yMax = Math.max(...bellDs.filter(d=>!d.label.startsWith('_')).flatMap(d=>d.data.map(p=>p.y)))*1.15;
+                [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                    bellDs.push({ label:`${lbl} (${val})`,
+                        data:[{x:val,y:0},{x:val,y:yMax}],
+                        borderColor:'#ef4444', borderDash:[7,4],
+                        borderWidth:2, pointRadius:0, fill:false, tension:0 });
+                });
+            }
+            if (_ndFullBellInst) _ndFullBellInst.destroy();
+            _ndFullBellInst = new Chart(document.getElementById('ndBell-full').getContext('2d'), {
+                type:'line', data:{datasets:bellDs},
+                options:{
+                    responsive:true, maintainAspectRatio:false, parsing:false, animation:false,
+                    plugins:{
+                        legend:{ display:true, position:'bottom',
+                            labels:{ boxWidth:12, font:{size:11},
+                                filter: item=>!item.text.startsWith('_') }},
+                        tooltip:{ filter: item=>!item.dataset.label.startsWith('_') }
+                    },
+                    scales:{
+                        x:{ type:'linear', ticks:{font:{size:11},maxTicksLimit:10,callback:v=>v.toFixed(3)},
+                            title:{display:true,text:'ความหนา (mm)',font:{size:11}} },
+                        y:{ ticks:{font:{size:11},maxTicksLimit:6,callback:v=>v.toFixed(2)},
+                            title:{display:true,text:'ความหนาแน่น',font:{size:11}} }
+                    }
+                }
+            });
+
+            // ── Scatter Chart ─────────────────────────────────────────────────
+            const scatDs = [];
+            tKeys.forEach((tk,ti) => {
+                if (!rawMap[tk].length) return;
+                scatDs.push({
+                    label: T_LABELS[tk],
+                    data: rawMap[tk].map(v=>({x:v, y:ti+(Math.random()-0.5)*0.5})),
+                    backgroundColor: T_COLORS[tk]+'cc',
+                    borderColor: T_COLORS[tk],
+                    borderWidth:0.5, pointRadius:5, pointStyle:'circle'
+                });
+                const st = statsMap[tk];
+                if (st) scatDs.push({ label:'_mean_'+tk,
+                    data:[{x:st.mean,y:ti-0.45},{x:st.mean,y:ti+0.45}],
+                    borderColor:T_COLORS[tk], borderDash:[5,3],
+                    borderWidth:2.5, pointRadius:0, fill:false, type:'line', tension:0 });
+            });
+            if (spec&&spec.usl!==null) {
+                [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                    scatDs.push({ label:lbl,
+                        data:[{x:val,y:-0.6},{x:val,y:2.6}],
+                        borderColor:'#ef4444', borderDash:[7,4],
+                        borderWidth:2, pointRadius:0, fill:false, type:'line', tension:0 });
+                });
+            }
+            if (_ndFullScatInst) _ndFullScatInst.destroy();
+            _ndFullScatInst = new Chart(document.getElementById('ndScatter-full').getContext('2d'), {
+                type:'scatter', data:{datasets:scatDs},
+                options:{
+                    responsive:true, maintainAspectRatio:false, animation:false,
+                    plugins:{
+                        legend:{display:false},
+                        tooltip:{ filter:item=>!item.dataset.label.startsWith('_'),
+                            callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(3)} mm`} }
+                    },
+                    scales:{
+                        x:{type:'linear', min:xMin, max:xMax,
+                           ticks:{font:{size:11},maxTicksLimit:10,callback:v=>v.toFixed(3)},
+                           title:{display:true,text:'ความหนา (mm)',font:{size:11}}},
+                        y:{min:-0.7, max:2.7, display:false}
+                    }
+                }
+            });
+
+            // ── Stats ──────────────────────────────────────────────────────────
+            const statsEl = document.getElementById('ndStats-full');
+            statsEl.innerHTML = tKeys.map(tk => {
+                const st = statsMap[tk];
+                if (!st) return '';
+                return `<span style="color:${T_COLORS[tk]};font-weight:600;">${T_LABELS[tk]}</span>` +
+                       `&nbsp;&nbsp; μ = <b>${st.mean.toFixed(4)}</b> &nbsp; σ = <b>${st.std.toFixed(4)}</b> &nbsp; n = ${st.n}`;
+            }).filter(Boolean).join('<br>');
+        }
+
+        function closeNdFullscreen(event, force) {
+            if (!force && event && event.target !== document.getElementById('nd-fullscreen-overlay')) return;
+            document.getElementById('nd-fullscreen-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ปิดด้วย Escape key
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeNdFullscreen(null, true);
+        });
+
     </script>
 
     <div id="toast-container" style="position:fixed; top:20px; right:20px; z-index:10000;"></div>
 
-  </body>
+  
+<!-- ND Fullscreen Overlay -->
+<div id="nd-fullscreen-overlay" onclick="closeNdFullscreen(event)">
+  <div id="nd-fullscreen-inner">
+    <button id="nd-fullscreen-close" onclick="closeNdFullscreen(null, true)">✕</button>
+    <div id="nd-fullscreen-title" class="text-center fw-bold mb-2" style="font-size:1rem;"></div>
+    <div style="height:55vh;"><canvas id="ndBell-full"></canvas></div>
+    <hr class="my-2">
+    <div style="height:20vh;"><canvas id="ndScatter-full"></canvas></div>
+    <div id="ndStats-full" class="mt-2 px-1" style="font-size:0.82rem;line-height:1.8;"></div>
+  </div>
+</div>
+</body>
 </html>
