@@ -1612,6 +1612,8 @@
                     <div style="height:160px;"><canvas id="ndBell-H"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-H"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-H" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
                   </div>
                 </div>
 
@@ -1622,6 +1624,8 @@
                     <div style="height:160px;"><canvas id="ndBell-HM"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-HM"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-HM" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
                   </div>
                 </div>
 
@@ -1632,6 +1636,8 @@
                     <div style="height:160px;"><canvas id="ndBell-M"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-M"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-M" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
                   </div>
                 </div>
 
@@ -1642,6 +1648,8 @@
                     <div style="height:160px;"><canvas id="ndBell-MT"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-MT"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-MT" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
                   </div>
                 </div>
 
@@ -1652,6 +1660,8 @@
                     <div style="height:160px;"><canvas id="ndBell-T"></canvas></div>
                     <hr class="my-1">
                     <div style="height:90px;"><canvas id="ndScatter-T"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-T" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
                   </div>
                 </div>
 
@@ -6136,11 +6146,11 @@ function updateLegendDisplay(index, log) {
             const T_LABELS = { t1: 'T1 ซ้าย', t2: 'T2 กลาง', t3: 'T3 ขวา' };
 
             const positions = [
-                { key:'H',  keys:['tH1','tH2','tH3'],   bellId:'ndBell-H',  scatId:'ndScatter-H'  },
-                { key:'HM', keys:['tHM1','tHM2','tHM3'], bellId:'ndBell-HM', scatId:'ndScatter-HM' },
-                { key:'M',  keys:['tM1','tM2','tM3'],   bellId:'ndBell-M',  scatId:'ndScatter-M'  },
-                { key:'MT', keys:['tMT1','tMT2','tMT3'], bellId:'ndBell-MT', scatId:'ndScatter-MT' },
-                { key:'T',  keys:['tT1','tT2','tT3'],   bellId:'ndBell-T',  scatId:'ndScatter-T'  }
+                { key:'H',  keys:['tH1','tH2','tH3'],   bellId:'ndBell-H',  scatId:'ndScatter-H',  statsId:'ndStats-H'  },
+                { key:'HM', keys:['tHM1','tHM2','tHM3'], bellId:'ndBell-HM', scatId:'ndScatter-HM', statsId:'ndStats-HM' },
+                { key:'M',  keys:['tM1','tM2','tM3'],   bellId:'ndBell-M',  scatId:'ndScatter-M',  statsId:'ndStats-M'  },
+                { key:'MT', keys:['tMT1','tMT2','tMT3'], bellId:'ndBell-MT', scatId:'ndScatter-MT', statsId:'ndStats-MT' },
+                { key:'T',  keys:['tT1','tT2','tT3'],   bellId:'ndBell-T',  scatId:'ndScatter-T',  statsId:'ndStats-T'  }
             ];
 
             function calcStats(arr) {
@@ -6210,6 +6220,19 @@ function updateLegendDisplay(index, log) {
                             borderWidth:1.5, pointRadius:0, fill:false, tension:0
                         });
                     });
+                }
+
+                // ── แสดงค่า μ และ σ ───────────────────────────────────────
+                const statsEl = document.getElementById(pos.statsId);
+                if (statsEl) {
+                    const rows = tKeys.map(tk => {
+                        const st = statsMap[tk];
+                        if (!st || st.n < 2) return '';
+                        const color = T_COLORS[tk];
+                        return `<span style="color:${color};font-weight:600;">${T_LABELS[tk]}</span>` +
+                               `&nbsp; μ=<b>${st.mean.toFixed(3)}</b>&nbsp; σ=<b>${st.std.toFixed(3)}</b>&nbsp; n=${st.n}`;
+                    }).filter(Boolean);
+                    statsEl.innerHTML = rows.join('<br>');
                 }
 
                 if (_ndBellInst[pos.key]) _ndBellInst[pos.key].destroy();
