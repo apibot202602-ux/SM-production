@@ -1596,61 +1596,76 @@
         </div>
       </div>
 
-            <!-- ============================================================ -->
-            <!-- Normal Distribution Charts — 5 ตำแหน่ง H/HM/M/MT/T         -->
-            <!-- แสดงหลังจาก loadTrendChart() เรียก renderNormalDistCharts() -->
-            <!-- ============================================================ -->
+            <!-- Normal Distribution — Bell Curve + Scatter (5 ตำแหน่ง) -->
             <div id="normal-dist-section" class="mt-4" style="display:none;">
               <div class="d-flex align-items-center mb-2 gap-2">
                 <span style="font-size:1rem;">📊</span>
                 <strong style="font-size:0.95rem;">การแจกแจงความหนา (Normal Distribution)</strong>
                 <span class="badge bg-secondary ms-1" id="nd-sample-count">n=0</span>
               </div>
-              <div class="row g-2">
+              <div class="row g-3">
+
                 <!-- H -->
                 <div class="col-12 col-md-6 col-xl-4">
                   <div class="border rounded bg-white p-2 shadow-sm">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#fd7e14;">ต้นม้วน (H)</div>
-                    <div style="height:200px;"><canvas id="ndChart-H"></canvas></div>
+                    <div style="height:160px;"><canvas id="ndBell-H"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-H"></canvas></div>
                   </div>
                 </div>
+
                 <!-- HM -->
                 <div class="col-12 col-md-6 col-xl-4">
                   <div class="border rounded bg-white p-2 shadow-sm">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#ffc107;">30m แรก (HM)</div>
-                    <div style="height:200px;"><canvas id="ndChart-HM"></canvas></div>
+                    <div style="height:160px;"><canvas id="ndBell-HM"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-HM"></canvas></div>
                   </div>
                 </div>
+
                 <!-- M -->
                 <div class="col-12 col-md-6 col-xl-4">
                   <div class="border rounded bg-white p-2 shadow-sm">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#4361ee;">กลางม้วน (M)</div>
-                    <div style="height:200px;"><canvas id="ndChart-M"></canvas></div>
+                    <div style="height:160px;"><canvas id="ndBell-M"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-M"></canvas></div>
                   </div>
                 </div>
+
                 <!-- MT -->
                 <div class="col-12 col-md-6 col-xl-4">
                   <div class="border rounded bg-white p-2 shadow-sm">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#9b5de5;">30m ท้าย (MT)</div>
-                    <div style="height:200px;"><canvas id="ndChart-MT"></canvas></div>
+                    <div style="height:160px;"><canvas id="ndBell-MT"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-MT"></canvas></div>
                   </div>
                 </div>
+
                 <!-- T -->
                 <div class="col-12 col-md-6 col-xl-4">
                   <div class="border rounded bg-white p-2 shadow-sm">
                     <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#d63384;">ท้ายม้วน (T)</div>
-                    <div style="height:200px;"><canvas id="ndChart-T"></canvas></div>
+                    <div style="height:160px;"><canvas id="ndBell-T"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-T"></canvas></div>
                   </div>
                 </div>
+
               </div>
               <!-- Legend -->
               <div class="d-flex gap-3 mt-2 flex-wrap" style="font-size:0.78rem;">
-                <span><span style="display:inline-block;width:24px;height:3px;background:#3b82f6;vertical-align:middle;margin-right:4px;"></span>T1 (ซ้าย)</span>
-                <span><span style="display:inline-block;width:24px;height:3px;background:#10b981;vertical-align:middle;margin-right:4px;"></span>T2 (กลาง)</span>
-                <span><span style="display:inline-block;width:24px;height:3px;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span>T3 (ขวา)</span>
-                <span><span style="display:inline-block;width:24px;height:3px;background:#ef4444;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;"></span>Spec</span>
+                <span><span style="display:inline-block;width:20px;height:3px;background:#3b82f6;vertical-align:middle;margin-right:4px;"></span>T1 ซ้าย</span>
+                <span><span style="display:inline-block;width:20px;height:3px;background:#10b981;vertical-align:middle;margin-right:4px;"></span>T2 กลาง</span>
+                <span><span style="display:inline-block;width:20px;height:3px;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span>T3 ขวา</span>
+                <span><span style="display:inline-block;width:20px;height:2px;background:#ef4444;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;"></span>Spec (USL/LSL)</span>
+                <span><span style="display:inline-block;width:20px;height:2px;background:#6b7280;border-top:2px dashed #6b7280;vertical-align:middle;margin-right:4px;"></span>Mean</span>
               </div>
             </div>
+</div>
 
     </div>
 
@@ -6102,131 +6117,191 @@ function updateLegendDisplay(index, log) {
         // รับ points[] จาก getAdvancedTrendData (มี tH1/tH2/tH3 ฯลฯ)
         // วาด 5 กราฟ (H, HM, M, MT, T) แต่ละกราฟ 3 เส้น (T1/T2/T3)
         // ============================================================
-        const _ndChartInstances = {};
+        // ============================================================
+        // Normal Distribution — Bell Curve (บน) + Scatter (ล่าง)
+        // Bell: 3 เส้น T1/T2/T3 + เส้น Mean แต่ละเส้น + เส้น Spec USL/LSL
+        // Scatter: จุดดิบ T1/T2/T3 แยกสี + เส้น Mean + เส้น Spec
+        // ============================================================
+        const _ndBellInst = {}, _ndScatInst = {};
 
         function renderNormalDistCharts(points, spec) {
             if (!points || points.length === 0) {
                 document.getElementById('normal-dist-section').style.display = 'none';
                 return;
             }
-
             document.getElementById('normal-dist-section').style.display = 'block';
             document.getElementById('nd-sample-count').textContent = 'n=' + points.length;
 
+            const T_COLORS = { t1: '#3b82f6', t2: '#10b981', t3: '#f59e0b' };
+            const T_LABELS = { t1: 'T1 ซ้าย', t2: 'T2 กลาง', t3: 'T3 ขวา' };
+
             const positions = [
-                { key: 'H',  t1: 'tH1',  t2: 'tH2',  t3: 'tH3',  canvasId: 'ndChart-H' },
-                { key: 'HM', t1: 'tHM1', t2: 'tHM2', t3: 'tHM3', canvasId: 'ndChart-HM' },
-                { key: 'M',  t1: 'tM1',  t2: 'tM2',  t3: 'tM3',  canvasId: 'ndChart-M' },
-                { key: 'MT', t1: 'tMT1', t2: 'tMT2', t3: 'tMT3', canvasId: 'ndChart-MT' },
-                { key: 'T',  t1: 'tT1',  t2: 'tT2',  t3: 'tT3',  canvasId: 'ndChart-T' }
+                { key:'H',  keys:['tH1','tH2','tH3'],   bellId:'ndBell-H',  scatId:'ndScatter-H'  },
+                { key:'HM', keys:['tHM1','tHM2','tHM3'], bellId:'ndBell-HM', scatId:'ndScatter-HM' },
+                { key:'M',  keys:['tM1','tM2','tM3'],   bellId:'ndBell-M',  scatId:'ndScatter-M'  },
+                { key:'MT', keys:['tMT1','tMT2','tMT3'], bellId:'ndBell-MT', scatId:'ndScatter-MT' },
+                { key:'T',  keys:['tT1','tT2','tT3'],   bellId:'ndBell-T',  scatId:'ndScatter-T'  }
             ];
 
+            function calcStats(arr) {
+                const n    = arr.length;
+                if (n === 0) return null;
+                const mean = arr.reduce((a,b)=>a+b,0)/n;
+                const std  = Math.sqrt(arr.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/n);
+                return { mean, std, n };
+            }
+
+            function normPDF(x, mean, std) {
+                if (std === 0) return 0;
+                return (1/(std*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*((x-mean)/std)**2);
+            }
+
             positions.forEach(pos => {
-                // ดึงค่าดิบกรอง null และ 0 ออก
-                const d1 = points.map(p => p[pos.t1]).filter(v => v !== null && v > 0);
-                const d2 = points.map(p => p[pos.t2]).filter(v => v !== null && v > 0);
-                const d3 = points.map(p => p[pos.t3]).filter(v => v !== null && v > 0);
+                const tKeys  = ['t1','t2','t3'];
+                const rawMap = {};                     // { t1: [v,...], t2: [...], t3: [...] }
+                const statsMap = {};                   // { t1: {mean,std}, ... }
 
-                if (d1.length === 0 && d2.length === 0 && d3.length === 0) return;
+                tKeys.forEach((tk, i) => {
+                    rawMap[tk] = points.map(p => p[pos.keys[i]]).filter(v => v !== null && v > 0);
+                    statsMap[tk] = calcStats(rawMap[tk]);
+                });
 
-                // คำนวณ mean และ std สำหรับแต่ละชุด
-                const allVals = [...d1, ...d2, ...d3];
-                const globalMin = Math.min(...allVals);
-                const globalMax = Math.max(...allVals);
+                const allVals = [...rawMap.t1, ...rawMap.t2, ...rawMap.t3];
+                if (allVals.length === 0) return;
 
-                // สร้าง x-axis range (±3σ จาก mean รวม)
-                const globalMean = allVals.reduce((a, b) => a + b, 0) / allVals.length;
-                const globalStd  = Math.sqrt(allVals.map(v => (v - globalMean) ** 2).reduce((a, b) => a + b, 0) / allVals.length);
-                const xMin = Math.min(globalMin, globalMean - 3.5 * globalStd, spec && spec.lsl ? spec.lsl - 0.05 : Infinity);
-                const xMax = Math.max(globalMax, globalMean + 3.5 * globalStd, spec && spec.usl ? spec.usl + 0.05 : -Infinity);
+                const gMean = allVals.reduce((a,b)=>a+b,0)/allVals.length;
+                const gStd  = Math.sqrt(allVals.map(v=>(v-gMean)**2).reduce((a,b)=>a+b,0)/allVals.length);
+                const xMin  = Math.min(...allVals, spec&&spec.lsl?spec.lsl:Infinity) - gStd*0.5;
+                const xMax  = Math.max(...allVals, spec&&spec.usl?spec.usl:-Infinity) + gStd*0.5;
+                const xPts  = Array.from({length:200},(_,i)=>xMin+(xMax-xMin)*i/199);
 
-                // สร้าง x points 200 จุด
-                const xPoints = Array.from({ length: 200 }, (_, i) => xMin + (xMax - xMin) * i / 199);
+                // ── BELL CURVE ─────────────────────────────────────────────────
+                const bellDatasets = [];
 
-                // ฟังก์ชัน Normal Distribution PDF
-                function normPDF(x, mean, std) {
-                    if (std === 0) return 0;
-                    return (1 / (std * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * ((x - mean) / std) ** 2);
-                }
+                tKeys.forEach(tk => {
+                    const st = statsMap[tk];
+                    if (!st || st.n < 2) return;
+                    bellDatasets.push({
+                        label: T_LABELS[tk],
+                        data: xPts.map(x=>({x, y:normPDF(x, st.mean, st.std)})),
+                        borderColor: T_COLORS[tk],
+                        backgroundColor: T_COLORS[tk]+'22',
+                        borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4
+                    });
+                    // เส้น Mean ของแต่ละ T (แนวตั้ง)
+                    const yPeak = normPDF(st.mean, st.mean, st.std);
+                    bellDatasets.push({
+                        label: '_mean_'+tk,
+                        data: [{x:st.mean,y:0},{x:st.mean,y:yPeak}],
+                        borderColor: T_COLORS[tk], borderDash:[4,3],
+                        borderWidth:1.2, pointRadius:0, fill:false, tension:0
+                    });
+                });
 
-                function buildDataset(data, color, label) {
-                    if (data.length < 2) return null;
-                    const mean = data.reduce((a, b) => a + b, 0) / data.length;
-                    const std  = Math.sqrt(data.map(v => (v - mean) ** 2).reduce((a, b) => a + b, 0) / data.length);
-                    return {
-                        label: label + ` (μ=${mean.toFixed(3)}, σ=${std.toFixed(3)})`,
-                        data: xPoints.map(x => ({ x, y: normPDF(x, mean, std) })),
-                        borderColor: color,
-                        backgroundColor: color + '22',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4
-                    };
-                }
-
-                const datasets = [
-                    buildDataset(d1, '#3b82f6', 'T1 ซ้าย'),
-                    buildDataset(d2, '#10b981', 'T2 กลาง'),
-                    buildDataset(d3, '#f59e0b', 'T3 ขวา')
-                ].filter(Boolean);
-
-                // เพิ่มเส้น Spec LSL / USL
+                // เส้น Spec USL/LSL
                 if (spec && spec.usl !== null) {
-                    const yMax = Math.max(...datasets.flatMap(ds => ds.data.map(p => p.y)));
-                    datasets.push({
-                        label: `USL (${spec.usl})`,
-                        data: [{ x: spec.usl, y: 0 }, { x: spec.usl, y: yMax * 1.1 }],
-                        borderColor: '#ef4444',
-                        borderDash: [5, 4],
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: false
-                    });
-                    datasets.push({
-                        label: `LSL (${spec.lsl})`,
-                        data: [{ x: spec.lsl, y: 0 }, { x: spec.lsl, y: yMax * 1.1 }],
-                        borderColor: '#ef4444',
-                        borderDash: [5, 4],
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: false
+                    const yMax = Math.max(...bellDatasets.filter(d=>!d.label.startsWith('_'))
+                                         .flatMap(d=>d.data.map(p=>p.y))) * 1.15;
+                    [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                        bellDatasets.push({
+                            label: lbl+'='+val,
+                            data: [{x:val,y:0},{x:val,y:yMax}],
+                            borderColor:'#ef4444', borderDash:[6,4],
+                            borderWidth:1.5, pointRadius:0, fill:false, tension:0
+                        });
                     });
                 }
 
-                // destroy กราฟเดิมถ้ามี
-                if (_ndChartInstances[pos.key]) {
-                    _ndChartInstances[pos.key].destroy();
-                }
-
-                const ctx = document.getElementById(pos.canvasId).getContext('2d');
-                _ndChartInstances[pos.key] = new Chart(ctx, {
+                if (_ndBellInst[pos.key]) _ndBellInst[pos.key].destroy();
+                const bellCtx = document.getElementById(pos.bellId).getContext('2d');
+                _ndBellInst[pos.key] = new Chart(bellCtx, {
                     type: 'line',
-                    data: { datasets },
+                    data: { datasets: bellDatasets },
                     options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        parsing: false,
+                        responsive:true, maintainAspectRatio:false, parsing:false,
+                        animation: false,
                         plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}`
+                            legend: {
+                                display: true, position:'bottom',
+                                labels: {
+                                    boxWidth:10, font:{size:8},
+                                    filter: item => !item.text.startsWith('_')
                                 }
+                            },
+                            tooltip: { filter: item => !item.dataset.label.startsWith('_') }
+                        },
+                        scales: {
+                            x: { type:'linear',
+                                 ticks:{font:{size:8},maxTicksLimit:7,callback:v=>v.toFixed(2)},
+                                 title:{display:false} },
+                            y: { ticks:{font:{size:8},maxTicksLimit:4,callback:v=>v.toFixed(1)},
+                                 title:{display:true,text:'ความหนาแน่น',font:{size:8}} }
+                        }
+                    }
+                });
+
+                // ── SCATTER PLOT ──────────────────────────────────────────────
+                const scatDatasets = [];
+
+                tKeys.forEach((tk, ti) => {
+                    if (rawMap[tk].length === 0) return;
+                    // jitter แกน Y แบบ strip chart เพื่อไม่ให้จุดทับกัน
+                    scatDatasets.push({
+                        label: T_LABELS[tk],
+                        data: rawMap[tk].map(v => ({
+                            x: v,
+                            y: ti + (Math.random()-0.5)*0.5   // jitter ± 0.25 รอบแถว ti
+                        })),
+                        backgroundColor: T_COLORS[tk]+'bb',
+                        borderColor: T_COLORS[tk],
+                        borderWidth:0.5, pointRadius:4, pointStyle:'circle'
+                    });
+                    // เส้น Mean แนวตั้งใน scatter
+                    const st = statsMap[tk];
+                    if (st) {
+                        scatDatasets.push({
+                            label: '_mean_'+tk,
+                            data: [{x:st.mean,y:ti-0.4},{x:st.mean,y:ti+0.4}],
+                            borderColor: T_COLORS[tk], borderDash:[4,3],
+                            borderWidth:2, pointRadius:0, fill:false,
+                            type:'line', tension:0
+                        });
+                    }
+                });
+
+                // เส้น Spec ใน Scatter
+                if (spec && spec.usl !== null) {
+                    [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                        scatDatasets.push({
+                            label: lbl,
+                            data: [{x:val,y:-0.6},{x:val,y:2.6}],
+                            borderColor:'#ef4444', borderDash:[6,4],
+                            borderWidth:1.5, pointRadius:0, fill:false,
+                            type:'line', tension:0
+                        });
+                    });
+                }
+
+                if (_ndScatInst[pos.key]) _ndScatInst[pos.key].destroy();
+                const scatCtx = document.getElementById(pos.scatId).getContext('2d');
+                _ndScatInst[pos.key] = new Chart(scatCtx, {
+                    type: 'scatter',
+                    data: { datasets: scatDatasets },
+                    options: {
+                        responsive:true, maintainAspectRatio:false,
+                        animation: false,
+                        plugins: {
+                            legend: { display:false },
+                            tooltip: {
+                                filter: item => !item.dataset.label.startsWith('_'),
+                                callbacks: { label: ctx=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(3)} mm` }
                             }
                         },
                         scales: {
-                            x: {
-                                type: 'linear',
-                                title: { display: true, text: 'ความหนา (mm)', font: { size: 9 } },
-                                ticks: { font: { size: 9 }, maxTicksLimit: 8,
-                                         callback: v => v.toFixed(2) }
-                            },
-                            y: {
-                                title: { display: true, text: 'ความหนาแน่น', font: { size: 9 } },
-                                ticks: { font: { size: 9 }, maxTicksLimit: 5,
-                                         callback: v => v.toFixed(1) }
-                            }
+                            x: { type:'linear', min:xMin, max:xMax,
+                                 ticks:{font:{size:8},maxTicksLimit:7,callback:v=>v.toFixed(2)},
+                                 title:{display:false} },
+                            y: { min:-0.7, max:2.7, display:false }
                         }
                     }
                 });
