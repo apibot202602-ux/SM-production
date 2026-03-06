@@ -3795,6 +3795,16 @@ function updateLegendDisplay(index, log) {
                             }
                         },
                         scales: {
+                            x: {
+                                ticks: {
+                                    // BUG FIX: Chart.js autoSkip ซ่อน label อัตโนมัติ ทำให้ดูเหมือนข้อมูลหาย
+                                    // แก้โดยให้แสดง label ทุก N จุด แทนการซ่อนแบบสุ่ม
+                                    autoSkip: true,
+                                    maxTicksLimit: 20,      // แสดงสูงสุด 20 label บนแกน X
+                                    maxRotation: 45,        // หมุน label 45 องศา ไม่ให้ชนกัน
+                                    minRotation: 30
+                                }
+                            },
                             y: { 
                                 title: { display: true, text: 'ความหนา (mm)' },
                                 // ปรับสเกลให้อัตโนมัติถ้าไม่มี Spec
@@ -6034,6 +6044,3 @@ function updateLegendDisplay(index, log) {
 
   </body>
 </html>
-
-
-
