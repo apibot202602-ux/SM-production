@@ -1161,6 +1161,9 @@
             <button onclick="showExecDashboard()" class="btn btn-light w-100 border shadow-sm fw-bold hover-shadow mt-2" style="color:#4361ee;">
               <i class="fa-solid fa-chart-pie me-1"></i> Analytics
             </button>
+            <button onclick="openSlitTracker()" class="btn btn-light w-100 border shadow-sm fw-bold hover-shadow mt-2" style="color:#7c3aed;">
+              <i class="fa-solid fa-film me-1"></i> Slit Thickness Tracker
+            </button>
           </div>
         </div>
       </div>
@@ -2530,6 +2533,15 @@ function updateLegendDisplay(index, log) {
             document.getElementById('btn-enter').disabled = true;
             loadInitial();
         }
+
+        // ── Slit Thickness Tracker ──────────────────────────────
+        // เปลี่ยน SLIT_TRACKER_URL ให้ตรงกับ URL ที่ deploy slit_tracker.html
+        const SLIT_TRACKER_URL = "https://script.google.com/macros/s/AKfycbwcZesY-cNsIkfIIBhFIh4l1GHUyIo3rEKXjv2V3qCa594wqG7pve06I7mRrn74taoZ/exec";
+
+        function openSlitTracker() {
+            window.open(SLIT_TRACKER_URL, '_blank');
+        }
+        // ────────────────────────────────────────────────────────
         document.getElementById('machine-select').addEventListener('change', () => document.getElementById('btn-enter').disabled = false);
 
         function switchScreen(id) {
@@ -6592,4 +6604,3 @@ function updateLegendDisplay(index, log) {
 </div>
 </body>
 </html>
-
