@@ -2972,6 +2972,7 @@ function updateLegendDisplay(index, log) {
                 try {
                     const compressPromises = Array.from(fileUploadIn.files).map(f => compressImage(f));
                     filePayloads = await Promise.all(compressPromises);
+                    console.log("📸 filePayloads:", filePayloads.length, "รูป", filePayloads.map(f => f?.data?.length));
                 } catch (err) {
                     console.error("Image compression error:", err);
                 }
@@ -3505,6 +3506,7 @@ function updateLegendDisplay(index, log) {
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> กำลังอัพโหลดรูป...';
                 try {
                     filePayload = await compressImage(fileIn.files[0]); // บีบอัดรูปก่อนส่ง
+                    console.log("📸 filePayload:", filePayload ? "มีข้อมูล size=" + filePayload.data.length : "null");
                 } catch (err) {
                     console.error("Image compression error:", err);
                 }
@@ -6571,3 +6573,4 @@ function updateLegendDisplay(index, log) {
 </div>
 </body>
 </html>
+
