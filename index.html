@@ -1157,7 +1157,10 @@
             <button onclick="enterSystem()" class="btn-main w-100 btn-lg mb-3" id="btn-enter" disabled>เข้าสู่ระบบ</button>
             <button onclick="showDashboard()" class="btn btn-light w-100 border shadow-sm text-secondary fw-bold hover-shadow">
               <i class="fa-solid fa-chart-line me-1"></i> ดูภาพรวม (Dashboard)
-          </button>
+            </button>
+            <button onclick="showExecDashboard()" class="btn btn-light w-100 border shadow-sm fw-bold hover-shadow mt-2" style="color:#4361ee;">
+              <i class="fa-solid fa-chart-pie me-1"></i> Analytics
+            </button>
           </div>
         </div>
       </div>
@@ -2972,7 +2975,6 @@ function updateLegendDisplay(index, log) {
                 try {
                     const compressPromises = Array.from(fileUploadIn.files).map(f => compressImage(f));
                     filePayloads = await Promise.all(compressPromises);
-                    console.log("📸 filePayloads:", filePayloads.length, "รูป", filePayloads.map(f => f?.data?.length));
                 } catch (err) {
                     console.error("Image compression error:", err);
                 }
@@ -3506,7 +3508,6 @@ function updateLegendDisplay(index, log) {
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> กำลังอัพโหลดรูป...';
                 try {
                     filePayload = await compressImage(fileIn.files[0]); // บีบอัดรูปก่อนส่ง
-                    console.log("📸 filePayload:", filePayload ? "มีข้อมูล size=" + filePayload.data.length : "null");
                 } catch (err) {
                     console.error("Image compression error:", err);
                 }
@@ -3927,7 +3928,13 @@ function updateLegendDisplay(index, log) {
                             tooltip: {
                                 callbacks: {
                                     title: (ctx) => `Job: ${points[ctx[0].dataIndex].jobId}`,
-                                    afterBody: (ctx) => `Coil: ${points[ctx[0].dataIndex].coil}`
+                                    afterBody: (ctx) => {
+                                        const p = points[ctx[0].dataIndex];
+                                        return [
+                                            `Coil: ${p.coil || '-'}`,
+                                            `Mill: ${p.millNo || '-'}`
+                                        ];
+                                    }
                                 }
                             }
                         },
@@ -6193,7 +6200,18 @@ function updateLegendDisplay(index, log) {
                 return;
             }
             document.getElementById('normal-dist-section').style.display = 'block';
-            document.getElementById('nd-sample-count').textContent = 'n=' + points.length;
+            // นับจำนวนแยกตาม Mill
+            const millCounts = {};
+            points.forEach(p => {
+                const m = p.millNo || 'N/A';
+                millCounts[m] = (millCounts[m] || 0) + 1;
+            });
+            const millBreakdown = Object.entries(millCounts)
+                .sort((a,b) => b[1]-a[1])
+                .map(([m,c]) => `${m}:${c}`)
+                .join(', ');
+            const millStr = millBreakdown ? ` (${millBreakdown})` : '';
+            document.getElementById('nd-sample-count').textContent = `n=${points.length}${millStr}`;
 
             const T_COLORS = { t1: '#3b82f6', t2: '#10b981', t3: '#f59e0b' };
             const T_LABELS = { t1: 'T1 ซ้าย', t2: 'T2 กลาง', t3: 'T3 ขวา' };
@@ -6573,4 +6591,3 @@ function updateLegendDisplay(index, log) {
 </div>
 </body>
 </html>
-
