@@ -3477,13 +3477,12 @@ function updateLegendDisplay(index, log) {
         function openAddJobModal() {
             const f = document.getElementById('add-job-form');
             f.reset();
-            f.newJobId.readOnly = false; // เปิดให้พิมพ์ Job ID ได้
+            resetSlitBuilder(); // BUG FIX: ล้าง slit rows เก่าที่ค้างจาก session ก่อนหน้า
+            f.newJobId.readOnly = false;
             document.getElementById('new-machine').value = CURRENT_MACHINE;
             
             const btn = document.getElementById('btn-add-job-save');
             btn.innerText = "สร้างแผนงานใหม่";
-            
-            // ล้างค่าพิเศษที่อาจค้างมาจากการกด "แก้ไข"
             f.dataset.mode = "ADD"; 
 
             new bootstrap.Modal(document.getElementById('modal-add-job')).show();
@@ -3498,7 +3497,8 @@ function updateLegendDisplay(index, log) {
             const originalText = btn.innerText;
             const fileIn = document.getElementById('new-job-file'); // ช่องเลือกรูปใบสั่ง
 
-            // 1. ดึงข้อมูลจากฟอร์ม
+            // 1. sync hidden input ก่อน FormData (BUG FIX: ป้องกันค่า Slit Plan ค้างเก่า)
+            updateSlitPreview();
             const fd = {};
             new FormData(f).forEach((v, k) => fd[k] = v);
 
@@ -4627,7 +4627,8 @@ function updateLegendDisplay(index, log) {
             f.newWorkType.value = job.workType;
             f.newThickness.value = job.thickness;
             f.newMill.value = job.millPlan;
-            if (job.stripWidth) f.newStripWidth.value = job.stripWidth;
+            // BUG FIX: ใช้ !== undefined แทน if(job.stripWidth) เพื่อรองรับค่า 0 ด้วย
+            if (job.stripWidth !== undefined) f.newStripWidth.value = job.stripWidth;
 
             // --- จุดสำคัญ: ดึงข้อมูล Slit Plan เก่ามาสร้างแถว ---
             if (job.slitPlan) {
@@ -6591,3 +6592,4 @@ function updateLegendDisplay(index, log) {
 </div>
 </body>
 </html>
+
