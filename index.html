@@ -2965,10 +2965,22 @@ function updateLegendDisplay(index, log) {
                 }
             }
 
+            // BUG FIX: compress รูปจาก #file-upload ก่อนส่ง (รองรับหลายรูป)
+            const fileUploadIn = document.getElementById('file-upload');
+            let filePayloads = [];
+            if (fileUploadIn && fileUploadIn.files.length > 0) {
+                try {
+                    const compressPromises = Array.from(fileUploadIn.files).map(f => compressImage(f));
+                    filePayloads = await Promise.all(compressPromises);
+                } catch (err) {
+                    console.error("Image compression error:", err);
+                }
+            }
+
             showLoading();
             btn.disabled = true;
 
-            callGAS('saveLogAndSlits', [fd, [], slitPayload], res => {
+            callGAS('saveLogAndSlits', [fd, filePayloads, slitPayload], res => {
                 hideLoading();
                 btn.disabled = false;
                 if (res.includes("SUCCESS")) {
@@ -3515,8 +3527,8 @@ function updateLegendDisplay(index, log) {
                     }
                 });
             } else {
-                // กรณีสร้างใหม่ (ADD) - แก้ไขจาก null เป็น filePayload
-                callGAS('addJob', [fd], res => {
+                // กรณีสร้างใหม่ (ADD) - BUG FIX: ใส่ filePayload เข้าไปใน args
+                callGAS('addJob', [fd, filePayload], res => {
                     btn.disabled = false; btn.innerText = originalText;
                     if (res === "SUCCESS") {
                         Swal.fire({ icon: 'success', title: 'สร้างแผนงานสำเร็จ', timer: 1500, showConfirmButton: false });
