@@ -1678,14 +1678,7 @@ function delRow(m){
 // ── Save ──────────────────────────────────────────────────
 function doSave(){ saveAllDirty(); }
 
-function toast(msg,type=''){
-  const a=document.getElementById('toast-area');
-  const e=document.createElement('div');
-  e.className='toast '+(type||'');e.textContent=msg;
-  a.appendChild(e);setTimeout(()=>e.remove(),2800);
-}
 
-renderSlitGrid();
 function saveAllDirty(){
   const dirty=CURRENT_SLITS.filter(s=>SLIT_DATA[s.slitId]?.dirty);
   if(!dirty.length){ toast('ไม่มีข้อมูลที่ต้องบันทึก'); return; }
