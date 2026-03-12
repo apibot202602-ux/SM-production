@@ -901,8 +901,30 @@ function switchTab(name){
 // ============================================================
 // STORAGE
 // ============================================================
-function saveLib(){ try{ localStorage.setItem('slit_profiles',JSON.stringify(LIBRARY)); }catch(e){} }
-function loadLib(){ try{ const d=localStorage.getItem('slit_profiles'); if(d) LIBRARY=JSON.parse(d); }catch(e){} }
+function saveLib(){
+  // Save to localStorage as cache
+  try{ localStorage.setItem('slit_profiles',JSON.stringify(LIBRARY)); }catch(e){}
+  // Save to Google Sheets (persistent across browsers)
+  callGAS('saveLibrary',[LIBRARY],
+    ()=>{ /* saved ok */ },
+    ()=>{ toast('บันทึก Library ไปยัง Cloud ไม่สำเร็จ','error'); }
+  );
+}
+function loadLib(){
+  // Load from GAS (cloud) — localStorage as fallback while loading
+  try{ const d=localStorage.getItem('slit_profiles'); if(d) LIBRARY=JSON.parse(d); }catch(e){}
+  callGAS('loadLibrary',[],
+    data=>{
+      if(data && typeof data==='object'){
+        LIBRARY=data;
+        try{ localStorage.setItem('slit_profiles',JSON.stringify(LIBRARY)); }catch(e){}
+        renderLibrary();
+        renderPredictSelect();
+      }
+    },
+    ()=>{ /* silently use localStorage cache */ }
+  );
+}
 
 // ============================================================
 // INIT
