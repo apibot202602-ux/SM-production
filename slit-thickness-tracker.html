@@ -454,6 +454,21 @@ body{background:var(--bg);font-family:'Sarabun',sans-serif;color:#1e293b;font-si
 .yield-chip-name{font-family:'Kanit',sans-serif;font-size:.72rem;font-weight:700;color:#1e293b;}
 .yield-chip-sub{font-size:.6rem;color:#64748b;}
 
+.zone-card-y{flex:1;min-width:80px;border-radius:9px;padding:8px 10px;
+  border:.5px solid #e2e8f0;background:#f8fafc;}
+.zone-card-y .zc-lbl{font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;
+  margin-bottom:5px;display:flex;align-items:center;gap:4px;}
+.zone-card-y .zc-dot{width:7px;height:7px;border-radius:50%;}
+.zone-card-y .zc-pips{display:flex;gap:2px;flex-wrap:wrap;margin-bottom:4px;}
+.zone-pip-y{width:13px;height:13px;border-radius:3px;cursor:pointer;
+  transition:transform .1s;flex-shrink:0;}
+.zone-pip-y:hover{transform:scale(1.25);}
+.zone-card-y .zc-stat{font-size:.6rem;color:#64748b;line-height:1.6;}
+.zbadge{display:inline-block;border-radius:4px;padding:1px 6px;font-size:.58rem;font-weight:700;}
+.zbadge-ok{background:#dcfce7;color:#15803d;}
+.zbadge-lo{background:#ffedd5;color:#c2410c;}
+.zbadge-hi{background:#fee2e2;color:#dc2626;}
+
 /* ── Predict ── */
 #pred-pattern-input:focus{border-color:#7c3aed;outline:none;background:#faf5ff;}
 #pred-result-table th{padding:6px 8px;text-align:center;font-size:.62rem;font-weight:700;
@@ -2303,10 +2318,24 @@ function yBuildSlitBlock(s,si){
       <!-- ⑤ Safe banner -->
       <div id="ybanner-${si}"></div>
 
-      <!-- ⑥ Chart -->
+      <!-- ⑥ Mini strip (C) + Zone summary (B) + Bar chart -->
+      <div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin:10px 0 5px;">④ การแบ่งท่อตลอดม้วน</div>
+      <div style="position:relative;margin-bottom:3px;">
+        <div id="ymini-${si}" style="display:flex;height:34px;border-radius:8px;overflow:hidden;border:.5px solid #e2e8f0;cursor:crosshair;"
+          onmousemove="yMiniHover(${si},event)" onmouseleave="yMiniLeave(${si})"></div>
+        <div id="ymini-tip-${si}" style="position:absolute;background:#1e293b;color:white;border-radius:6px;padding:4px 9px;font-size:.65rem;font-weight:700;pointer-events:none;z-index:10;white-space:nowrap;top:-34px;transform:translateX(-50%);display:none;"></div>
+      </div>
+      <div id="ymini-pos-${si}" style="display:flex;position:relative;height:16px;margin-bottom:6px;"></div>
+      <div id="ymini-detail-${si}" style="background:#f8fafc;border-radius:7px;padding:6px 10px;font-size:.68rem;color:#64748b;line-height:1.8;margin-bottom:10px;min-height:34px;">
+        ↑ เลื่อนเมาส์บนแถบเพื่อดูแต่ละเส้น
+      </div>
+
+      <div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">⑤ สรุปตาม Zone</div>
+      <div id="yzone-${si}" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;"></div>
+
       <div class="yield-chart-wrap">
         <div class="yield-chart-title">
-          <span><i class="fa-solid fa-chart-area" style="margin-right:4px;"></i>Weight vs Cut length</span>
+          <span><i class="fa-solid fa-chart-bar" style="margin-right:4px;"></i>น้ำหนักแต่ละเส้น (kg)</span>
           <span id="ychart-safe-${si}" style="font-size:.65rem;color:var(--p);font-weight:700;"></span>
         </div>
         <div class="yield-chart-inner"><canvas id="ychart-${si}"></canvas></div>
@@ -2444,84 +2473,12 @@ function yRenderBanner(si){
 
 // ── chart ─────────────────────────────────────────────────────
 function yRenderChart(si){
-  const c=YIELD_CFG[si]||{};
-  const spec=yGetSpec(si);
-  const thkMap=yGetThkMap(CURRENT_SLITS[si].slitId);
-  const canvas=document.getElementById(`ychart-${si}`);
-  if(!canvas) return;
-
-  if(YIELD_CHARTS[si]){ YIELD_CHARTS[si].destroy(); YIELD_CHARTS[si]=null; }
-
-  if(!Object.keys(thkMap).length||!spec.nom){ return; }
-
-  // x-axis: 0.5 to 16 m
-  const xs=[];
-  for(let x=0.5;x<=16;x+=0.25) xs.push(parseFloat(x.toFixed(2)));
-
-  const posColors=YIELD_POS_COLORS;
-  const datasets=YIELD_POS.filter(pos=>thkMap[pos]!=null).map(pos=>{
-    const kgm=yKgPerM(c.type||'round',thkMap[pos],c);
-    return {
-      label:pos,
-      data:xs.map(x=>({x,y:parseFloat((kgm*x).toFixed(4))})),
-      borderColor:posColors[pos],backgroundColor:posColors[pos]+'22',
-      tension:0,pointRadius:0,borderWidth:1.8,fill:false
-    };
-  });
-
-  // spec lines
-  datasets.push({label:`Max ${spec.max.toFixed(3)}`,
-    data:[{x:0,y:spec.max},{x:16,y:spec.max}],
-    borderColor:'#ef4444',borderDash:[5,4],borderWidth:1.2,pointRadius:0,fill:false});
-  datasets.push({label:`Min ${spec.min.toFixed(3)}`,
-    data:[{x:0,y:spec.min},{x:16,y:spec.min}],
-    borderColor:'#f97316',borderDash:[5,4],borderWidth:1.2,pointRadius:0,fill:false});
-
-  const cut=c.cutLen||6;
-  const allW=YIELD_POS.filter(p=>thkMap[p]).map(p=>yKgPerM(c.type||'round',thkMap[p],c)*cut);
-  const yMin=Math.min(...allW,spec.min)*0.97;
-  const yMax=Math.max(...allW,spec.max)*1.03;
-
-  YIELD_CHARTS[si]=new Chart(canvas.getContext('2d'),{
-    type:'line', data:{datasets},
-    options:{
-      responsive:true,maintainAspectRatio:false,parsing:false,
-      animation:{duration:0},
-      plugins:{
-        legend:{position:'bottom',labels:{boxWidth:9,font:{size:9},padding:7}},
-        tooltip:{callbacks:{
-          title:c=>`Cut: ${c[0].parsed.x.toFixed(1)} m`,
-          label:c=>`${c.dataset.label}: ${c.parsed.y?.toFixed(3)} kg`
-        }}
-      },
-      scales:{
-        x:{type:'linear',min:0,max:16,
-          title:{display:true,text:'Cut length (m)',font:{size:9}},
-          ticks:{font:{size:9},stepSize:2}},
-        y:{
-          title:{display:true,text:'Weight/เส้น (kg)',font:{size:9}},
-          ticks:{font:{size:9},callback:v=>v.toFixed(2)},
-          min:yMin,max:yMax
-        }
-      }
-    }
-  });
-
-  yUpdateCutLine(si, cut);
-  yOnSlide(si, cut);
+  yRenderMiniStrip(si);
+  yRenderZoneSummary(si);
+  yRenderPipeChart(si);
 }
 
-// ── cut line on chart (draws annotation via dataset) ─────────
-function yUpdateCutLine(si, cut){
-  const ch=YIELD_CHARTS[si]; if(!ch) return;
-  // find or add cut-line dataset
-  let idx=ch.data.datasets.findIndex(d=>d._isCutLine);
-  const yMin2=ch.scales?.y?.min??0, yMax2=ch.scales?.y?.max??10;
-  const ds={_isCutLine:true,label:'', data:[{x:cut,y:yMin2},{x:cut,y:yMax2}],
-    borderColor:'#4361ee',borderDash:[4,3],borderWidth:1.5,pointRadius:0,fill:false};
-  if(idx>=0) ch.data.datasets[idx]=ds; else ch.data.datasets.push(ds);
-  ch.update('none');
-}
+function yUpdateCutLine(si,cut){ /* superseded by yRenderPipeChart */ }
 
 // ── slider handler ────────────────────────────────────────────
 function yOnSlide(si, forceVal){
@@ -2562,7 +2519,9 @@ function yOnSlide(si, forceVal){
     cr.innerHTML=`<b>${v.toFixed(1)} m</b> → ${parts}`;
   }
 
-  yUpdateCutLine(si, v);
+  yRenderMiniStrip(si);
+  yRenderZoneSummary(si);
+  yRenderPipeChart(si);
   yRenderTable(si);
   yRenderBanner(si);
 
@@ -2721,6 +2680,269 @@ function yRenderSummary(){
     </div>`).join('');
 }
 
+
+
+// ============================================================
+// YIELD — Mini Strip + Zone helpers
+// ============================================================
+const YIELD_ZONE_COLORS={H:'#4361ee',HM:'#7c3aed',M:'#059669',MT:'#d97706',T:'#0891b2'};
+const YIELD_THK_PROFILE=[
+  {pct:0,   lbl:'H'},
+  {pct:0.25,lbl:'HM'},
+  {pct:0.50,lbl:'M'},
+  {pct:0.75,lbl:'MT'},
+  {pct:1.00,lbl:'T'}
+];
+
+// ── Build array of pipe objects from coil for a given slit ───
+function yBuildPipes(si, cutLen){
+  const coilL = ySlitLength(si)||0;
+  if(!coilL||!cutLen) return [];
+  const c = YIELD_CFG[si]||{};
+  const thkMap = yGetThkMap(CURRENT_SLITS[si].slitId);
+  const spec = yGetSpec(si);
+  // thickness interpolation along the coil
+  function interpCoilThk(m){
+    const pct = Math.min(1,Math.max(0,m/coilL));
+    const pts = YIELD_POS.filter(p=>thkMap[p]!=null).map(p=>{
+      const idx = YIELD_POS.indexOf(p);
+      return {pct:idx/4, thk:thkMap[p]};
+    });
+    if(!pts.length) return parseFloat(CURRENT_JOB?.thickness)||2.0;
+    if(pct<=pts[0].pct) return pts[0].thk;
+    if(pct>=pts[pts.length-1].pct) return pts[pts.length-1].thk;
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i],b=pts[i+1];
+      if(pct>=a.pct&&pct<=b.pct){
+        const t=(pct-a.pct)/(b.pct-a.pct);
+        return a.thk+(b.thk-a.thk)*t;
+      }
+    }
+    return pts[pts.length-1].thk;
+  }
+  function getZone(m){
+    const pct=m/coilL;
+    if(pct<.125) return 'H';
+    if(pct<.375) return 'HM';
+    if(pct<.625) return 'M';
+    if(pct<.875) return 'MT';
+    return 'T';
+  }
+  const pipes=[];
+  let pos=0;
+  while(pos+cutLen<=coilL+.001){
+    const mid=Math.min(pos+cutLen/2,coilL);
+    const thk=interpCoilThk(mid);
+    const km=yKgPerM(c.type||'round',thk,c);
+    const w=parseFloat((km*cutLen).toFixed(3));
+    pipes.push({
+      no:pipes.length+1,
+      start:parseFloat(pos.toFixed(2)),
+      end:parseFloat(Math.min(pos+cutLen,coilL).toFixed(2)),
+      mid:parseFloat(mid.toFixed(2)),
+      thk:parseFloat(thk.toFixed(4)),
+      kgm:parseFloat(km.toFixed(4)),
+      w, coilL,
+      ok:w>=spec.min&&w<=spec.max,
+      lo:w<spec.min, hi:w>spec.max,
+      zone:getZone(mid)
+    });
+    pos+=cutLen;
+  }
+  return pipes;
+}
+
+function ySegColor(p){ return p.lo?'#fed7aa':p.hi?'#fca5a5':'#86efac'; }
+
+// ── Render mini strip (C) ─────────────────────────────────────
+function yRenderMiniStrip(si){
+  const c=YIELD_CFG[si]||{};
+  const pipes=yBuildPipes(si,c.cutLen||6);
+  const coilL=ySlitLength(si)||0;
+  const strip=document.getElementById(`ymini-${si}`);
+  const posRow=document.getElementById(`ymini-pos-${si}`);
+  if(!strip||!coilL) return;
+
+  // store pipes on element for hover lookup
+  strip._pipes=pipes;
+  strip._coilL=coilL;
+  strip._cutLen=c.cutLen||6;
+
+  strip.innerHTML='';
+  const remain=parseFloat((coilL-pipes.length*(c.cutLen||6)).toFixed(2));
+
+  pipes.forEach(p=>{
+    const seg=document.createElement('div');
+    seg.style.cssText=`flex:${c.cutLen||6};background:${ySegColor(p)};border-right:.5px solid rgba(255,255,255,.35);flex-shrink:0;`;
+    strip.appendChild(seg);
+  });
+  if(remain>.1){
+    const sc=document.createElement('div');
+    sc.style.cssText=`flex:${remain};background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 2px,#f8fafc 2px,#f8fafc 5px);flex-shrink:0;`;
+    strip.appendChild(sc);
+  }
+
+  // pos markers
+  if(posRow){
+    posRow.innerHTML='';
+    YIELD_THK_PROFILE.forEach(pt=>{
+      const m=document.createElement('div');
+      m.style.cssText=`position:absolute;left:${pt.pct*100}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;`;
+      m.innerHTML=`<div style="width:1px;height:5px;background:#94a3b8;"></div><div style="font-size:.55rem;color:#64748b;font-weight:700;">${pt.lbl}</div>`;
+      posRow.appendChild(m);
+    });
+  }
+}
+
+// ── Mini strip hover ──────────────────────────────────────────
+function yMiniHover(si, e){
+  const strip=document.getElementById(`ymini-${si}`);
+  const tip=document.getElementById(`ymini-tip-${si}`);
+  const detail=document.getElementById(`ymini-detail-${si}`);
+  if(!strip||!strip._pipes) return;
+  const rect=strip.getBoundingClientRect();
+  const pct=(e.clientX-rect.left)/rect.width;
+  const m=pct*strip._coilL;
+  const p=strip._pipes.find(pp=>m>=pp.start&&m<pp.end);
+  if(!p){
+    if(tip) tip.style.display='none';
+    return;
+  }
+  // tooltip
+  if(tip){
+    const col=p.lo?'#f97316':p.hi?'#ef4444':'#22c55e';
+    tip.innerHTML=`<span>#${p.no}</span> <b style="color:${col};">${p.w.toFixed(3)} kg</b> ${p.lo?'⚠↓':p.hi?'⚠↑':'✓'}`;
+    tip.style.display='block';
+    const x=Math.min(Math.max(e.clientX-rect.left,50),rect.width-60);
+    tip.style.left=x+'px';
+  }
+  // detail bar
+  if(detail){
+    const bg=p.lo?'#fff7ed':p.hi?'#fef2f2':'#f0fdf4';
+    const tc=p.lo?'#c2410c':p.hi?'#dc2626':'#15803d';
+    const st=p.lo?'⚠ Under Min':p.hi?'⚠ Over Max':'✓ OK';
+    detail.style.background=bg;
+    detail.innerHTML=`<b style="color:${tc};">เส้นที่ ${p.no} — ${st}</b> &nbsp;|&nbsp; ${p.start}–${p.end} m &nbsp;|&nbsp; Zone: ${p.zone} &nbsp;|&nbsp; t: <b>${p.thk.toFixed(4)}</b> mm &nbsp;|&nbsp; <b style="color:${tc};">${p.w.toFixed(3)} kg</b> &nbsp;(spec ${yGetSpec(si).min.toFixed(3)}–${yGetSpec(si).max.toFixed(3)})`;
+  }
+}
+function yMiniLeave(si){
+  const tip=document.getElementById(`ymini-tip-${si}`);
+  if(tip) tip.style.display='none';
+}
+
+// ── Render zone summary (B) ───────────────────────────────────
+function yRenderZoneSummary(si){
+  const c=YIELD_CFG[si]||{};
+  const pipes=yBuildPipes(si,c.cutLen||6);
+  const zoneEl=document.getElementById(`yzone-${si}`);
+  if(!zoneEl) return;
+
+  const zones={H:[],HM:[],M:[],MT:[],T:[]};
+  pipes.forEach(p=>zones[p.zone].push(p));
+
+  zoneEl.innerHTML='';
+  ['H','HM','M','MT','T'].forEach(z=>{
+    const zp=zones[z];
+    if(!zp.length) return;
+    const nOk=zp.filter(p=>p.ok).length;
+    const nLo=zp.filter(p=>p.lo).length;
+    const nHi=zp.filter(p=>p.hi).length;
+    const zc=YIELD_ZONE_COLORS[z];
+    const div=document.createElement('div');
+    div.className='zone-card-y';
+    // pip squares (max 30 shown, rest shown as count)
+    const showN=Math.min(zp.length,30);
+    const pipsHtml=zp.slice(0,showN).map((p,i)=>`
+      <div class="zone-pip-y" style="background:${ySegColor(p)}cc;"
+        title="เส้น ${p.no}: ${p.w}kg"></div>`).join('')+
+      (zp.length>30?`<div style="font-size:.55rem;color:#94a3b8;align-self:center;">+${zp.length-30}</div>`:'');
+    div.innerHTML=`
+      <div class="zc-lbl"><div class="zc-dot" style="background:${zc};"></div>${z}</div>
+      <div class="zc-pips">${pipsHtml}</div>
+      <div class="zc-stat">
+        ${nOk>0?`<span class="zbadge zbadge-ok">✓ ${nOk}</span> `:''}
+        ${nLo>0?`<span class="zbadge zbadge-lo">↓ ${nLo}</span> `:''}
+        ${nHi>0?`<span class="zbadge zbadge-hi">↑ ${nHi}</span>`:''}
+      </div>`;
+    zoneEl.appendChild(div);
+  });
+}
+
+// ── Bar chart: weight per pipe ────────────────────────────────
+function yRenderPipeChart(si){
+  const c=YIELD_CFG[si]||{};
+  const spec=yGetSpec(si);
+  const pipes=yBuildPipes(si,c.cutLen||6);
+  const canvas=document.getElementById(`ychart-${si}`);
+  if(!canvas||!pipes.length||!spec.nom) return;
+
+  if(YIELD_CHARTS[si]){YIELD_CHARTS[si].destroy();YIELD_CHARTS[si]=null;}
+
+  const bgC=pipes.map(p=>p.lo?'#fed7aa':p.hi?'#fca5a5':'#86efac');
+  const bdC=pipes.map(p=>p.lo?'#f97316':p.hi?'#ef4444':'#22c55e');
+  const coilL=ySlitLength(si)||1;
+  const barW=Math.max(2,Math.min(18,540/pipes.length));
+
+  YIELD_CHARTS[si]=new Chart(canvas.getContext('2d'),{
+    data:{datasets:[
+      {type:'bar',label:'kg/เส้น',
+        data:pipes.map(p=>({x:p.mid,y:p.w})),
+        backgroundColor:bgC,borderColor:bdC,borderWidth:1,
+        borderRadius:2,barThickness:barW},
+      {type:'line',label:`Max ${spec.max.toFixed(3)}`,
+        data:[{x:0,y:spec.max},{x:coilL,y:spec.max}],
+        borderColor:'#ef4444',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false},
+      {type:'line',label:`Min ${spec.min.toFixed(3)}`,
+        data:[{x:0,y:spec.min},{x:coilL,y:spec.min}],
+        borderColor:'#f97316',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,parsing:false,
+      animation:{duration:80},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title:ctx=>{
+            const p=pipes.find(p=>Math.abs(p.mid-ctx[0].parsed.x)<(c.cutLen||6)*.6);
+            return p?`เส้นที่ ${p.no}  (${p.start}–${p.end} m)`:'';
+          },
+          label:ctx=>{
+            if(ctx.dataset.label.includes('Max')||ctx.dataset.label.includes('Min')) return ctx.dataset.label;
+            const p=pipes.find(p=>Math.abs(p.mid-ctx.parsed.x)<(c.cutLen||6)*.6);
+            if(!p) return '';
+            const st=p.lo?'⚠ Under':p.hi?'⚠ Over':'✓ OK';
+            return `${p.w.toFixed(3)} kg ${st}  |  t=${p.thk.toFixed(3)}mm`;
+          }
+        }}
+      },
+      scales:{
+        x:{type:'linear',min:0,max:coilL,
+          title:{display:true,text:'ตำแหน่งในม้วน (m)',font:{size:9},color:'#64748b'},
+          ticks:{font:{size:9},color:'#64748b',
+            callback:v=>{
+              const marks={0:'H',
+                [parseFloat((coilL*.25).toFixed(0))]:'HM',
+                [parseFloat((coilL*.5).toFixed(0))]:'M',
+                [parseFloat((coilL*.75).toFixed(0))]:'MT',
+                [coilL.toFixed(0)]:'T'};
+              return marks[v]!==undefined?marks[v]:v+'m';
+            },
+            maxTicksLimit:8},
+          grid:{color:'#f1f5f9'}},
+        y:{title:{display:true,text:'kg/เส้น',font:{size:9},color:'#64748b'},
+          ticks:{font:{size:9},callback:v=>v.toFixed(2)},
+          min:spec.min*.97,max:spec.max*1.03,
+          grid:{color:'#f1f5f9'}}
+      }
+    }
+  });
+
+  // update safe label
+  const safeEl=document.getElementById(`ychart-safe-${si}`);
+  const nOk=pipes.filter(p=>p.ok).length;
+  const nOut=pipes.length-nOk;
+  if(safeEl) safeEl.textContent=`${pipes.length} เส้น | OK ${nOk} | Out ${nOut}`;
+}
 
 
 </script>
