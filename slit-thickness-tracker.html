@@ -2463,7 +2463,8 @@ function yRenderTable(si){
 
   // ── สรุปสถิติจาก pipes จริง ──────────────────────────────────
   const ws=pipes.map(p=>p.w);
-  const wMin=Math.min(...ws), wMax=Math.max(...ws);
+  const wMin=ws.reduce((a,b)=>a<b?a:b, ws[0]);
+  const wMax=ws.reduce((a,b)=>a>b?a:b, ws[0]);
   const wAvg=parseFloat((ws.reduce((a,b)=>a+b,0)/ws.length).toFixed(3));
   const nOk=pipes.filter(p=>p.ok).length;
   const nLo=pipes.filter(p=>p.lo).length;
@@ -2645,7 +2646,7 @@ function yOnSlide(si, forceVal){
 
   const safe=yFindSafeRange(si);
   const safeEl=document.getElementById(`ychart-safe-${si}`);
-  if(safeEl&&safe) safeEl.textContent=`Safe: ${safe.min.toFixed(2)}–${safe.max.toFixed(2)} m`;
+  if(safeEl&&safe) safeEl.textContent=`Safe: ${Math.round(safe.min)}–${Math.round(safe.max)} mm`;
 
   // update pill
   const pill=yGetPillHtml(si);
@@ -2671,7 +2672,8 @@ function yOnDimChange(si){
 }
 
 function yOnCutChange(si){
-  const v=parseFloat(document.getElementById(`ycut-${si}`)?.value)||6000;
+  const raw=parseFloat(document.getElementById(`ycut-${si}`)?.value)||6000;
+  const v=Math.max(100,raw);  // ป้องกัน cut < 100mm
   YIELD_CFG[si].cutLen=v;
   const sl=document.getElementById(`ysl-${si}`);
   if(sl) sl.value=v;
@@ -2826,6 +2828,7 @@ const YIELD_THK_PROFILE=[
 function yBuildPipes(si, cutLen){
   const coilL = ySlitLength(si)||0;
   if(!coilL||!cutLen) return [];
+  if(cutLen<100) return [];  // guard: ป้องกัน cut length น้อยเกิน → ท่อแสนเส้น → stack overflow
   const c = YIELD_CFG[si]||{};
   const thkMap = yGetThkMap(CURRENT_SLITS[si].slitId);
   const spec = yGetSpec(si);
