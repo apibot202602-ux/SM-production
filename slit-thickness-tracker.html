@@ -2175,7 +2175,7 @@ function yFindSafeRange(si){
   });
   if(maxSafe===999) return null;
   // convert back to mm
-  return {min:parseFloat((minSafe*1000).toFixed(3)),max:parseFloat((maxSafe*1000).toFixed(3))};
+  return {min:Math.round(minSafe*1000), max:Math.round(maxSafe*1000)};
 }
 
 // ── Init config ───────────────────────────────────────────────
@@ -2312,7 +2312,7 @@ function yBuildSlitBlock(s,si){
           <input class="auto-val" readonly id="ythk-${si}"
             value="${yGetAvgThk(si).toFixed(3)}" title="ค่าเฉลี่ย t2 จาก interpolation"></div>
         <div class="yield-field"><label>Cut length (m)</label>
-          <input type="number" id="ycut-${si}" value="${c.cutLen}" step="0.001" min="1"
+          <input type="number" id="ycut-${si}" value="${c.cutLen}" step="1" min="1"
             oninput="yOnCutChange(${si})"></div>
       </div>
 
@@ -2378,7 +2378,7 @@ function yBuildSlitBlock(s,si){
           <label>Cut:</label>
           <input type="range" id="ysl-${si}" min="500" max="16000" step="1"
             value="${c.cutLen}" oninput="yOnSlide(${si})">
-          <span class="yield-slider-val" id="ysv-${si}">${c.cutLen.toFixed(3)} mm</span>
+          <span class="yield-slider-val" id="ysv-${si}">${Math.round(c.cutLen)} mm</span>
         </div>
         <div class="yield-cut-readout" id="ycr-${si}"></div>
       </div>
@@ -2446,7 +2446,7 @@ function yRenderTable(si){
   if(!pipes.length||!coilL){
     let html=`<table class="yield-res-tbl"><thead><tr>
       <th>ตำแหน่ง</th><th>t interpolate (mm)</th><th>kg/m</th>
-      <th>Weight @ ${cut.toFixed(3)}mm</th><th>สถานะ</th></tr></thead><tbody>`;
+      <th>Weight @ ${Math.round(cut)} mm</th><th>สถานะ</th></tr></thead><tbody>`;
     YIELD_POS.forEach(pos=>{
       const thk=thkMap[pos]; if(!thk) return;
       const kgm=yKgPerM(c.type||'round',thk,{...c, slitWidth:CURRENT_SLITS[si].width});
@@ -2476,7 +2476,7 @@ function yRenderTable(si){
     <div style="background:#f0fdf4;border-radius:8px;padding:7px 10px;border-left:3px solid #22c55e;">
       <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">จำนวน</div>
       <div style="font-size:.95rem;font-weight:700;color:#15803d;">${pipes.length} เส้น</div>
-      <div style="font-size:.58rem;color:#64748b;">เศษ ${remain>.1?remain.toFixed(3)+'mm':'ไม่มี'}</div>
+      <div style="font-size:.58rem;color:#64748b;">เศษ ${remain>.1?Math.round(remain*1000)+'mm':'ไม่มี'}</div>
     </div>
     <div style="background:#f0fdf4;border-radius:8px;padding:7px 10px;border-left:3px solid #22c55e;">
       <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">OK / Out</div>
@@ -2574,13 +2574,13 @@ function yRenderBanner(si){
   if(outs.length>2) cls2='yb-bad';
 
   let title=allOk
-    ?`✓ ทุกตำแหน่งอยู่ใน Spec ที่ cut ${cut.toFixed(3)} mm`
-    :`⚠ ${outs.join(', ')} หลุด Spec ที่ cut ${cut.toFixed(3)} mm`;
+    ?`✓ ทุกตำแหน่งอยู่ใน Spec ที่ cut ${Math.round(cut)} mm`
+    :`⚠ ${outs.join(', ')} หลุด Spec ที่ cut ${Math.round(cut)} mm`;
 
   let detail=hasRange
-    ?`Safe cut range: <b>${safe.min.toFixed(2)} m – ${safe.max.toFixed(2)} m</b> &nbsp;·&nbsp;
-      เกิน ${safe.max.toFixed(3)} mm → ตำแหน่ง T น้ำหนักเกิน Max &nbsp;·&nbsp;
-      ต่ำกว่า ${safe.min.toFixed(3)} mm → ตำแหน่ง H น้ำหนักต่ำกว่า Min`
+    ?`Safe cut range: <b>${Math.round(safe.min)} – ${Math.round(safe.max)} mm</b> &nbsp;·&nbsp;
+      เกิน ${Math.round(safe.max)} mm → ตำแหน่ง T น้ำหนักเกิน Max &nbsp;·&nbsp;
+      ต่ำกว่า ${Math.round(safe.min)} mm → ตำแหน่ง H น้ำหนักต่ำกว่า Min`
     :'ไม่สามารถคำนวณ Safe range ได้ (กรุณาตั้ง Spec ก่อน)';
 
   el.innerHTML=`<div class="yield-safe-banner ${cls2}">
@@ -2604,11 +2604,11 @@ function yOnSlide(si, forceVal){
   const v=forceVal!==undefined?parseFloat(forceVal):parseFloat(sl?.value||6);
   if(sl) sl.value=v;
   const sv=document.getElementById(`ysv-${si}`);
-  if(sv) sv.textContent=v.toFixed(3)+' mm';
+  if(sv) sv.textContent=Math.round(v)+' mm';
 
   // sync cut input
   const cutInp=document.getElementById(`ycut-${si}`);
-  if(cutInp) cutInp.value=v.toFixed(3);
+  if(cutInp) cutInp.value=Math.round(v);
   if(YIELD_CFG[si]) YIELD_CFG[si].cutLen=v;
 
   const c=YIELD_CFG[si]||{}, spec=yGetSpec(si);
@@ -2634,7 +2634,7 @@ function yOnSlide(si, forceVal){
   if(cr){
     cr.style.background=allOk?'#f0fdf4':'#fef2f2';
     cr.style.color=allOk?'#15803d':'#dc2626';
-    cr.innerHTML=`<b>${v.toFixed(3)} mm</b> → ${parts}`;
+    cr.innerHTML=`<b>${Math.round(v)} mm</b> → ${parts}`;
   }
 
   yRenderMiniStrip(si);
@@ -2800,8 +2800,8 @@ function yRenderSummary(){
           &nbsp;<span class="yield-status-pill ${pill.cls}" style="font-size:.55rem;">${pill.txt}</span>
         </div>
         <div class="yield-chip-sub">
-          ${pcs} เส้น @ ${cut.toFixed(3)}mm
-          ${safe?` · safe ≤ ${safe.max.toFixed(2)} m`:''}
+          ${pcs} เส้น @ ${Math.round(cut)} mm
+          ${safe?` · safe ≤ ${Math.round(safe.max)} mm`:''}
           ${spec.nom?` · nom ${spec.nom.toFixed(3)} kg`:''}
         </div>
       </div>
