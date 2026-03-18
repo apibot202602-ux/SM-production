@@ -1050,28 +1050,37 @@ function switchTab(name){
 // ============================================================
 // STORAGE
 // ============================================================
+
+// Safe localStorage wrapper — silently ignores Tracking Prevention blocks
+const safeStore = {
+  get(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } },
+  set(key,val){ try{ localStorage.setItem(key,val); }catch(e){} },
+  del(key){ try{ localStorage.removeItem(key); }catch(e){} }
+};
+
 function saveLib(){
-  // Save to localStorage as cache
-  try{ localStorage.setItem('slit_profiles',JSON.stringify(LIBRARY)); }catch(e){}
-  // Save to Google Sheets (persistent across browsers)
+  safeStore.set('slit_profiles', JSON.stringify(LIBRARY));
   callGAS('saveLibrary',[LIBRARY],
     ()=>{ /* saved ok */ },
     ()=>{ toast('บันทึก Library ไปยัง Cloud ไม่สำเร็จ','error'); }
   );
 }
 function loadLib(){
-  // Load from GAS (cloud) — localStorage as fallback while loading
-  try{ const d=localStorage.getItem('slit_profiles'); if(d) LIBRARY=JSON.parse(d); }catch(e){}
+  // Use cached value while cloud loads
+  try{
+    const d=safeStore.get('slit_profiles');
+    if(d) LIBRARY=JSON.parse(d);
+  }catch(e){}
   callGAS('loadLibrary',[],
     data=>{
       if(data && typeof data==='object'){
         LIBRARY=data;
-        try{ localStorage.setItem('slit_profiles',JSON.stringify(LIBRARY)); }catch(e){}
+        safeStore.set('slit_profiles', JSON.stringify(LIBRARY));
         renderLibrary();
         renderPredictSelect();
       }
     },
-    ()=>{ /* silently use localStorage cache */ }
+    ()=>{ /* silently use local cache */ }
   );
 }
 
