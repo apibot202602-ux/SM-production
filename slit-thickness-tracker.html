@@ -2109,14 +2109,21 @@ function yGetThkMap(slitId){
 }
 
 // ── Proportional coil weight & length for a slit ─────────────
+function yMotherAvgWeight(){
+  // Average weight of 1 selected mother coil
+  // slitting is done one coil at a time -> slit weights must sum to 1 coil
+  const sel=COIL_LIST.filter(c=>c.selected&&c.weight>0);
+  if(!sel.length) return null;
+  return parseFloat((sel.reduce((a,c)=>a+(c.weight||0),0)/sel.length).toFixed(1));
+}
 function ySlitWeight(si){
   const sw=parseFloat(CURRENT_JOB?.stripWidth)||0;
   if(!sw) return null;
   const slit=CURRENT_SLITS[si];
   const ratio=slit.width/sw;
-  const sel=COIL_LIST.filter(c=>c.selected);
-  if(!sel.length) return null;
-  return parseFloat((sel.reduce((a,c)=>a+(c.weight||0),0)*ratio).toFixed(1));
+  const avg=yMotherAvgWeight();
+  if(!avg) return null;
+  return parseFloat((avg*ratio).toFixed(1));
 }
 function ySlitLength(si){
   const w=ySlitWeight(si); if(!w) return null;
@@ -2184,12 +2191,20 @@ function renderYieldTab(){
   // Info bar
   const sel=COIL_LIST.filter(c=>c.selected);
   const totalW=sel.reduce((a,c)=>a+(c.weight||0),0);
+  const avgW=sel.length?parseFloat((totalW/sel.length).toFixed(1)):0;
+  // validate: sum of slit weights should equal avgW (one coil at a time)
+  const slitWSum=CURRENT_SLITS.reduce((a,_,si)=>a+(ySlitWeight(si)||0),0);
+  const sw=parseFloat(CURRENT_JOB?.stripWidth)||0;
+  const slitWidthSum=CURRENT_SLITS.reduce((a,s)=>a+s.width,0);
+  const scrapW=sw>0?parseFloat(((1-(slitWidthSum/sw))*avgW).toFixed(1)):0;
   document.getElementById('yield-info-bar').innerHTML=
     `<b>Job:</b> ${CURRENT_JOB.jobId} &nbsp;|&nbsp;
      <b>Strip:</b> ${CURRENT_JOB.stripWidth}mm &nbsp;|&nbsp;
      <b>Thickness:</b> ${parseFloat(CURRENT_JOB.thickness).toFixed(2)}mm &nbsp;|&nbsp;
      <b>Slits:</b> ${CURRENT_SLITS.length} เส้น &nbsp;|&nbsp;
-     <b>Mother coil รวม:</b> ${totalW.toLocaleString()} kg (${sel.length} coil) &nbsp;|&nbsp;
+     <b>avg 1 Mother coil:</b> ${avgW.toLocaleString()} kg (เฉลี่ยจาก ${sel.length} coil) &nbsp;|&nbsp;
+     <b>Slit รวม:</b> ${slitWSum.toLocaleString()} kg${scrapW>0?` + scrap ${scrapW} kg`:''}
+     &nbsp;|&nbsp;
      <b>USL/LSL:</b> ${SPEC.usl?SPEC.usl:'—'} / ${SPEC.lsl?SPEC.lsl:'—'} mm`;
 
   // Render slit accordion blocks
@@ -2641,6 +2656,13 @@ function yRenderSummary(){
     return _+(ySlitLength(i)||0);
   },0);
 
+  const avgMother=yMotherAvgWeight()||0;
+  const slitWSum=CURRENT_SLITS.reduce((a,_,si)=>a+(ySlitWeight(si)||0),0);
+  const sw2=parseFloat(CURRENT_JOB?.stripWidth)||0;
+  const slitWidthSum2=CURRENT_SLITS.reduce((a,s)=>a+s.width,0);
+  const scrapW2=sw2>0?parseFloat(((avgMother*(1-slitWidthSum2/sw2))).toFixed(1)):0;
+  const weightOk=avgMother>0&&Math.abs(slitWSum+scrapW2-avgMother)<5;
+
   sumGrid.innerHTML=`
     <div class="yield-sum-card" style="border-color:#4361ee;">
       <div class="yield-sum-lbl">จำนวนรวม (ประมาณ)</div>
@@ -2651,9 +2673,12 @@ function yRenderSummary(){
       }).join(' + ')} เส้น</div>
     </div>
     <div class="yield-sum-card" style="border-color:#059669;">
-      <div class="yield-sum-lbl">ความยาวม้วนรวม</div>
-      <div class="yield-sum-val">${totalL.toFixed(0)} <span class="yield-sum-unit">m</span></div>
-      <div class="yield-sum-sub">เฉลี่ย ${CURRENT_SLITS.length?( totalL/CURRENT_SLITS.length).toFixed(0):0} m/slit</div>
+      <div class="yield-sum-lbl">น้ำหนัก slit รวม vs Mother</div>
+      <div class="yield-sum-val" style="font-size:.95rem;color:${weightOk?'#15803d':'#dc2626'};">
+        ${slitWSum.toLocaleString()} kg
+        ${scrapW2>0?`<span style="font-size:.65rem;color:#94a3b8;"> +scrap ${scrapW2}</span>`:''}
+      </div>
+      <div class="yield-sum-sub">${weightOk?'✓ ตรงกับ Mother':`avg Mother: ${avgMother.toLocaleString()} kg`}</div>
     </div>
     <div class="yield-sum-card" style="border-color:${safeMax<990?'#f59e0b':'#059669'};">
       <div class="yield-sum-lbl">Safe cut สูงสุด (ทุก Slit)</div>
