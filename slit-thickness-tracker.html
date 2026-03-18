@@ -2137,8 +2137,15 @@ function ySlitWeight(si){
 function ySlitLength(si){
   const w=ySlitWeight(si); if(!w) return null;
   const slit=CURRENT_SLITS[si];
-  const thk=parseFloat(CURRENT_JOB?.thickness)||0; if(!thk) return null;
-  return calcCoilLength(w,slit.width,thk);
+  // ใช้ avg thickness จากการวัดจริง (t2 ค่าเฉลี่ย H/HM/M/MT/T)
+  // ถ้ายังไม่มี measurement ให้ fallback เป็น nominal thickness จาก Job
+  const thkMap=yGetThkMap(slit.slitId);
+  const measuredVals=Object.values(thkMap).filter(v=>v!=null);
+  const avgThk=measuredVals.length
+    ? parseFloat((measuredVals.reduce((a,b)=>a+b,0)/measuredVals.length).toFixed(4))
+    : parseFloat(CURRENT_JOB?.thickness)||0;
+  if(!avgThk) return null;
+  return calcCoilLength(w, slit.width, avgThk);
 }
 
 // ── Spec helper ───────────────────────────────────────────────
@@ -2427,30 +2434,113 @@ function yRenderTable(si){
     return;
   }
 
-  let html=`<table class="yield-res-tbl"><thead><tr>
-    <th>ตำแหน่ง</th><th>t (mm)</th><th>kg/m</th>
-    <th>Weight @ ${cut.toFixed(1)}m</th>
-    <th>Spec ${spec.min.toFixed(3)}–${spec.max.toFixed(3)}</th>
-    <th>สถานะ</th></tr></thead><tbody>`;
+  // ── ดึงน้ำหนักจาก yBuildPipes ── ตรงกับ strip/chart 100%
+  const pipes=yBuildPipes(si, cut);
+  const coilL=ySlitLength(si)||0;
+
+  // หากยังไม่มี coil length (ไม่มี weight data) → แสดงตาราง per-position แบบเดิม
+  if(!pipes.length||!coilL){
+    let html=`<table class="yield-res-tbl"><thead><tr>
+      <th>ตำแหน่ง</th><th>t interpolate (mm)</th><th>kg/m</th>
+      <th>Weight @ ${cut.toFixed(1)}m</th><th>สถานะ</th></tr></thead><tbody>`;
+    YIELD_POS.forEach(pos=>{
+      const thk=thkMap[pos]; if(!thk) return;
+      const kgm=yKgPerM(c.type||'round',thk,c);
+      const w=kgm*cut;
+      const lo=w<spec.min,hi=w>spec.max;
+      html+=`<tr><td class="ytd-pos">${pos}</td>
+        <td class="ytd-n">${thk.toFixed(3)}</td>
+        <td class="ytd-n">${kgm.toFixed(4)}</td>
+        <td class="${lo?'ytd-lo':hi?'ytd-hi':'ytd-ok'}">${w.toFixed(3)} kg</td>
+        <td class="${lo?'ytd-lo':hi?'ytd-hi':'ytd-ok'}">${lo?'⚠ Under':hi?'⚠ Over':'✓ OK'}</td></tr>`;
+    });
+    el.innerHTML=html+'</tbody></table>'; return;
+  }
+
+  // ── สรุปสถิติจาก pipes จริง ──────────────────────────────────
+  const ws=pipes.map(p=>p.w);
+  const wMin=Math.min(...ws), wMax=Math.max(...ws);
+  const wAvg=parseFloat((ws.reduce((a,b)=>a+b,0)/ws.length).toFixed(3));
+  const nOk=pipes.filter(p=>p.ok).length;
+  const nLo=pipes.filter(p=>p.lo).length;
+  const nHi=pipes.filter(p=>p.hi).length;
+  const remain=parseFloat((coilL-pipes.length*cut).toFixed(2));
+
+  // ── header: summary stats ─────────────────────────────────────
+  let html=`
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;">
+    <div style="background:#f0fdf4;border-radius:8px;padding:7px 10px;border-left:3px solid #22c55e;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">จำนวน</div>
+      <div style="font-size:.95rem;font-weight:700;color:#15803d;">${pipes.length} เส้น</div>
+      <div style="font-size:.58rem;color:#64748b;">เศษ ${remain>.1?remain.toFixed(1)+'m':'ไม่มี'}</div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:8px;padding:7px 10px;border-left:3px solid #22c55e;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">OK / Out</div>
+      <div style="font-size:.95rem;font-weight:700;color:#15803d;">${nOk} <span style="font-size:.7rem;color:${nLo+nHi>0?'#dc2626':'#94a3b8'};">/ ${nLo+nHi}</span></div>
+      <div style="font-size:.58rem;color:#64748b;">↓${nLo} ↑${nHi}</div>
+    </div>
+    <div style="background:#f8fafc;border-radius:8px;padding:7px 10px;border-left:3px solid #4361ee;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">Weight avg</div>
+      <div style="font-size:.95rem;font-weight:700;color:#1e293b;">${wAvg.toFixed(3)}</div>
+      <div style="font-size:.58rem;color:#64748b;">kg/เส้น</div>
+    </div>
+    <div style="background:#f8fafc;border-radius:8px;padding:7px 10px;border-left:3px solid #7c3aed;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">Weight range</div>
+      <div style="font-size:.82rem;font-weight:700;color:#1e293b;">${wMin.toFixed(3)}–${wMax.toFixed(3)}</div>
+      <div style="font-size:.58rem;color:#64748b;">kg/เส้น</div>
+    </div>
+  </div>`;
+
+  // ── per-zone table: avg weight ของท่อในแต่ละ zone ────────────
+  const zones={H:[],HM:[],M:[],MT:[],T:[]};
+  pipes.forEach(p=>zones[p.zone].push(p));
+
+  html+=`<table class="yield-res-tbl"><thead><tr>
+    <th>Zone</th>
+    <th>t interpolate (mm)</th>
+    <th>kg/m</th>
+    <th>Weight avg (kg/เส้น)</th>
+    <th>Min–Max (kg)</th>
+    <th>จำนวน</th>
+    <th>สถานะ</th>
+  </tr></thead><tbody>`;
 
   YIELD_POS.forEach(pos=>{
+    const zp=zones[pos];
     const thk=thkMap[pos];
-    if(!thk){
-      html+=`<tr><td class="ytd-pos">${pos}</td><td colspan="5" style="color:#cbd5e1;text-align:center;font-size:.65rem;">ไม่มีข้อมูล</td></tr>`;
+    if(!thk&&!zp.length) return;
+
+    if(!zp.length){
+      // ตำแหน่งนี้ไม่มีท่อ (ม้วนสั้นเกิน)
+      html+=`<tr><td class="ytd-pos">${pos}</td><td colspan="6" style="color:#cbd5e1;font-size:.62rem;text-align:center;">ไม่มีท่อในช่วงนี้</td></tr>`;
       return;
     }
-    const kgm=yKgPerM(c.type||'round',thk,c);
-    const w=kgm*cut;
-    const lo=w<spec.min, hi=w>spec.max;
-    const sc=lo?'ytd-lo':hi?'ytd-hi':'ytd-ok';
-    const st=lo?'⚠ Under':hi?'⚠ Over':'✓ OK';
-    html+=`<tr><td class="ytd-pos">${pos}</td>
-      <td class="ytd-n">${thk.toFixed(3)}</td>
-      <td class="ytd-n">${kgm.toFixed(4)}</td>
-      <td class="${sc}">${w.toFixed(3)} kg</td>
-      <td class="ytd-n">${spec.min.toFixed(3)}–${spec.max.toFixed(3)}</td>
-      <td class="${sc}">${st}</td></tr>`;
+
+    // ใช้ thickness interpolate ที่ตำแหน่งนั้นจริงๆ จาก thkMap
+    const thkDisplay=thk||null;
+    const kgm=thkDisplay?yKgPerM(c.type||'round',thkDisplay,c):null;
+
+    const zws=zp.map(p=>p.w);
+    const zavg=parseFloat((zws.reduce((a,b)=>a+b,0)/zws.length).toFixed(3));
+    const zmin=Math.min(...zws), zmax=Math.max(...zws);
+    const znOk=zp.filter(p=>p.ok).length;
+    const znLo=zp.filter(p=>p.lo).length;
+    const znHi=zp.filter(p=>p.hi).length;
+    const allOk=znLo+znHi===0;
+    const sc=allOk?'ytd-ok':znLo>0?'ytd-lo':'ytd-hi';
+    const st=allOk?'✓ OK':znLo>0&&znHi>0?`↓${znLo} ↑${znHi}`:znLo>0?`↓ ${znLo} เส้น`:` ↑ ${znHi} เส้น`;
+
+    html+=`<tr>
+      <td class="ytd-pos">${pos}</td>
+      <td class="ytd-n">${thkDisplay?thkDisplay.toFixed(4):'—'}</td>
+      <td class="ytd-n">${kgm?kgm.toFixed(4):'—'}</td>
+      <td class="${sc}">${zavg.toFixed(3)}</td>
+      <td class="ytd-n" style="font-size:.62rem;">${zmin.toFixed(3)}–${zmax.toFixed(3)}</td>
+      <td class="ytd-n">${zp.length}</td>
+      <td class="${sc}">${st}</td>
+    </tr>`;
   });
+
   html+='</tbody></table>';
   el.innerHTML=html;
 }
