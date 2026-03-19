@@ -469,6 +469,34 @@ body{background:var(--bg);font-family:'Sarabun',sans-serif;color:#1e293b;font-si
 .zbadge-lo{background:#ffedd5;color:#c2410c;}
 .zbadge-hi{background:#fee2e2;color:#dc2626;}
 
+/* ═══════════════════════════════════════════
+   YIELD HEADER MINI STRIP
+   ═══════════════════════════════════════════ */
+/* wrapper ใน header — แทนพื้นที่ว่างระหว่าง meta กับ pill */
+.yield-hdr-strip-wrap{
+  flex:1;display:flex;flex-direction:column;gap:2px;
+  margin:0 8px;min-width:0;overflow:hidden;cursor:pointer;}
+/* แถบสี */
+.yield-hdr-strip{
+  display:flex;height:22px;border-radius:6px;overflow:hidden;
+  border:.5px solid rgba(255,255,255,.15);position:relative;}
+/* stats row ด้านล่างแถบ */
+.yield-hdr-stats{
+  display:flex;gap:6px;font-size:.56rem;font-weight:700;
+  color:#64748b;white-space:nowrap;overflow:hidden;}
+.yield-hdr-stat-ok{color:#15803d;}
+.yield-hdr-stat-out{color:#dc2626;}
+/* tooltip ที่ลอยอยู่บน strip */
+.yield-hdr-tip{
+  position:absolute;background:#1e293b;color:white;border-radius:5px;
+  padding:3px 8px;font-size:.6rem;font-weight:700;pointer-events:none;
+  z-index:20;white-space:nowrap;top:-28px;transform:translateX(-50%);
+  display:none;}
+/* ซ่อน hdr-strip-wrap ตอนเปิด body */
+.y-open .yield-hdr-strip-wrap{display:none;}
+/* ซ่อน body mini strip ตอนปิด */
+.yield-slit-block:not(.y-open) .yield-body-strip-section{display:none;}
+
 /* ── Predict ── */
 #pred-pattern-input:focus{border-color:#7c3aed;outline:none;background:#faf5ff;}
 #pred-result-table th{padding:6px 8px;text-align:center;font-size:.62rem;font-weight:700;
@@ -2278,16 +2306,31 @@ function yBuildSlitBlock(s,si){
   const typeLabels={round:'ท่อกลม',shs:'SHS',rhs:'RHS',c:'เหล็กซี'};
 
   wrap.innerHTML=`
-    <div class="yield-slit-hdr" onclick="yToggle(${si})">
-      <div class="yield-dot" style="background:${s.color};"></div>
-      <div class="yield-slit-label" style="color:${s.color};">S${si+1}</div>
-      <div class="yield-slit-meta">
+    <div class="yield-slit-hdr" onclick="yToggle(${si})" style="flex-wrap:nowrap;min-width:0;">
+      <div class="yield-dot" style="background:${s.color};flex-shrink:0;"></div>
+      <div class="yield-slit-label" style="color:${s.color};flex-shrink:0;">S${si+1}</div>
+      <div class="yield-slit-meta" style="flex-shrink:0;white-space:nowrap;">
         ${s.width}mm
         ${coilW!=null?` · <b>${coilW.toLocaleString()}</b> kg`:''}
         ${coilL!=null?` · ≈ <b>${coilL.toFixed(0)}</b> m`:''}
       </div>
-      <span class="yield-status-pill ${pill.cls}" id="ypill-${si}">${pill.txt}</span>
-      <i class="fa-solid fa-chevron-down yield-chevron"></i>
+      <!-- header mini strip (แสดงเฉพาะตอนปิด) -->
+      <div class="yield-hdr-strip-wrap" id="yhdr-wrap-${si}" onclick="event.stopPropagation();yToggle(${si})">
+        <div style="position:relative;">
+          <div id="yhdr-strip-${si}" class="yield-hdr-strip"
+            onmousemove="yHdrHover(${si},event)" onmouseleave="yHdrLeave(${si})"
+            style="cursor:pointer;"></div>
+          <div id="yhdr-tip-${si}" class="yield-hdr-tip"></div>
+        </div>
+        <div id="yhdr-stats-${si}" class="yield-hdr-stats">
+          <span class="yield-hdr-stat-ok">— OK</span>
+          <span style="color:#94a3b8;">|</span>
+          <span id="yhdr-out-${si}" class="yield-hdr-stat-out" style="display:none;">— Out</span>
+          <span id="yhdr-count-${si}" style="color:#94a3b8;">—</span>
+        </div>
+      </div>
+      <span class="yield-status-pill ${pill.cls}" id="ypill-${si}" style="flex-shrink:0;">${pill.txt}</span>
+      <i class="fa-solid fa-chevron-down yield-chevron" style="flex-shrink:0;"></i>
     </div>
     <div class="yield-slit-body">
 
@@ -2354,6 +2397,7 @@ function yBuildSlitBlock(s,si){
       <div id="ybanner-${si}"></div>
 
       <!-- ⑥ Mini strip (C) + Zone summary (B) + Bar chart -->
+      <div class="yield-body-strip-section">
       <div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin:10px 0 5px;">④ การแบ่งท่อตลอดม้วน</div>
       <div style="position:relative;margin-bottom:3px;">
         <div id="ymini-${si}" style="display:flex;height:34px;border-radius:8px;overflow:hidden;border:.5px solid #e2e8f0;cursor:crosshair;"
@@ -2363,6 +2407,7 @@ function yBuildSlitBlock(s,si){
       <div id="ymini-pos-${si}" style="display:flex;position:relative;height:16px;margin-bottom:6px;"></div>
       <div id="ymini-detail-${si}" style="background:#f8fafc;border-radius:7px;padding:6px 10px;font-size:.68rem;color:#64748b;line-height:1.8;margin-bottom:10px;min-height:34px;">
         ↑ เลื่อนเมาส์บนแถบเพื่อดูแต่ละเส้น
+      </div>
       </div>
 
       <div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">⑤ สรุปตาม Zone</div>
@@ -2410,14 +2455,26 @@ function yGetPillHtml(si){
   if(!spec.nom) return {cls:'ypill-empty',txt:'ยังไม่ตั้ง Spec'};
   const c=YIELD_CFG[si]||{};
   const cut=c.cutLen||6000;
+  // ใช้ pipes จริงถ้ามี coil length
+  const coilL=ySlitLength(si)||0;
+  if(coilL){
+    const pipes=yBuildPipes(si,cut);
+    const nOk=pipes.filter(p=>p.ok).length;
+    const nOut=pipes.length-nOk;
+    if(!nOut) return {cls:'ypill-ok', txt:`✓ ${nOk} OK`};
+    if(nOut<=Math.ceil(pipes.length*.3)) return {cls:'ypill-warn', txt:`⚠ ${nOk} OK / ${nOut} Out`};
+    return {cls:'ypill-bad', txt:`✕ ${nOk} OK / ${nOut} Out`};
+  }
+  // fallback: position-based (ยังไม่มี coil length)
   const outs=YIELD_POS.filter(pos=>{
     if(!thkMap[pos]) return false;
     const w=yKgPerM(c.type||'round',thkMap[pos],{...c, slitWidth:CURRENT_SLITS[si].width})*(cut/1000);
     return w<spec.min||w>spec.max;
   });
-  if(!outs.length) return {cls:'ypill-ok',txt:'✓ All OK'};
-  if(outs.length<=2) return {cls:'ypill-warn',txt:`⚠ ${outs.join(',')} หลุด`};
-  return {cls:'ypill-bad',txt:`✕ ${outs.length} pos หลุด`};
+  const nOkPos=YIELD_POS.filter(pos=>thkMap[pos]).length-outs.length;
+  if(!outs.length) return {cls:'ypill-ok',txt:`✓ ${nOkPos} OK`};
+  if(outs.length<=2) return {cls:'ypill-warn',txt:`⚠ ${nOkPos} OK / ${outs.length} Out`};
+  return {cls:'ypill-bad',txt:`✕ ${nOkPos} OK / ${outs.length} Out`};
 }
 
 // ── result table ──────────────────────────────────────────────
@@ -2886,36 +2943,38 @@ function yBuildPipes(si, cutLen){
 
 function ySegColor(p){ return p.lo?'#fed7aa':p.hi?'#fca5a5':'#86efac'; }
 
-// ── Render mini strip (C) ─────────────────────────────────────
+// ── Render mini strip (C) — body + header ─────────────────────
 function yRenderMiniStrip(si){
   const c=YIELD_CFG[si]||{};
   const pipes=yBuildPipes(si,c.cutLen||6000);
   const coilL=ySlitLength(si)||0;
   const strip=document.getElementById(`ymini-${si}`);
   const posRow=document.getElementById(`ymini-pos-${si}`);
-  if(!strip||!coilL) return;
 
-  // store pipes on element for hover lookup
-  strip._pipes=pipes;
-  strip._coilL=coilL;
-  strip._cutLen=c.cutLen||6000;
-
-  strip.innerHTML='';
   const cutLenM2=(c.cutLen||6000)/1000;
-  const remain=parseFloat((coilL-pipes.length*cutLenM2).toFixed(3));
+  const remain=coilL?parseFloat((coilL-pipes.length*cutLenM2).toFixed(3)):0;
 
-  pipes.forEach(p=>{
-    const seg=document.createElement('div');
-    seg.style.cssText=`flex:${c.cutLen||6};background:${ySegColor(p)};border-right:.5px solid rgba(255,255,255,.35);flex-shrink:0;`;
-    strip.appendChild(seg);
-  });
-  if(remain>.1){
-    const sc=document.createElement('div');
-    sc.style.cssText=`flex:${remain};background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 2px,#f8fafc 2px,#f8fafc 5px);flex-shrink:0;`;
-    strip.appendChild(sc);
+  // ── helper: fill any strip element with pipe segments ──────────
+  function fillStrip(el){
+    if(!el||!coilL) return;
+    el._pipes=pipes; el._coilL=coilL; el._cutLen=c.cutLen||6000;
+    el.innerHTML='';
+    pipes.forEach(p=>{
+      const seg=document.createElement('div');
+      seg.style.cssText=`flex:${c.cutLen||6};background:${ySegColor(p)};border-right:.5px solid rgba(255,255,255,.18);flex-shrink:0;`;
+      el.appendChild(seg);
+    });
+    if(remain>.1){
+      const sc=document.createElement('div');
+      sc.style.cssText=`flex:${remain*1000};background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 2px,#f8fafc 2px,#f8fafc 5px);flex-shrink:0;`;
+      el.appendChild(sc);
+    }
   }
 
-  // pos markers
+  // Body strip
+  if(strip&&coilL) fillStrip(strip);
+
+  // pos markers (body)
   if(posRow){
     posRow.innerHTML='';
     YIELD_THK_PROFILE.forEach(pt=>{
@@ -2924,6 +2983,22 @@ function yRenderMiniStrip(si){
       m.innerHTML=`<div style="width:1px;height:5px;background:#94a3b8;"></div><div style="font-size:.55rem;color:#64748b;font-weight:700;">${pt.lbl}</div>`;
       posRow.appendChild(m);
     });
+  }
+
+  // ── Header mini strip ──────────────────────────────────────────
+  const hdrStrip=document.getElementById(`yhdr-strip-${si}`);
+  fillStrip(hdrStrip);
+
+  // Header stats row
+  const nOk=pipes.filter(p=>p.ok).length;
+  const nOut=pipes.length-nOk;
+  const statsEl=document.getElementById(`yhdr-stats-${si}`);
+  if(statsEl&&pipes.length){
+    const outSpan=document.getElementById(`yhdr-out-${si}`);
+    const countSpan=document.getElementById(`yhdr-count-${si}`);
+    statsEl.children[0].textContent=`${nOk} OK`;
+    if(outSpan){ outSpan.textContent=`${nOut} Out`; outSpan.style.display=nOut>0?'':'none'; }
+    if(countSpan) countSpan.textContent=`${pipes.length} เส้น @ ${Math.round(c.cutLen||6000)} mm`;
   }
 }
 
@@ -2960,6 +3035,29 @@ function yMiniHover(si, e){
 }
 function yMiniLeave(si){
   const tip=document.getElementById(`ymini-tip-${si}`);
+  if(tip) tip.style.display='none';
+}
+
+// ── Header strip hover (same logic, different elements) ───────
+function yHdrHover(si, e){
+  const strip=document.getElementById(`yhdr-strip-${si}`);
+  const tip=document.getElementById(`yhdr-tip-${si}`);
+  if(!strip||!strip._pipes) return;
+  const rect=strip.getBoundingClientRect();
+  const pct=(e.clientX-rect.left)/rect.width;
+  const m=pct*strip._coilL;
+  const p=strip._pipes.find(pp=>m>=pp.start&&m<pp.end);
+  if(!p){ if(tip) tip.style.display='none'; return; }
+  if(tip){
+    const col=p.lo?'#f97316':p.hi?'#ef4444':'#22c55e';
+    tip.innerHTML=`<span>#${p.no}</span> <b style="color:${col};">${p.w.toFixed(3)} kg</b> ${p.lo?'⚠↓':p.hi?'⚠↑':'✓'}`;
+    tip.style.display='block';
+    const x=Math.min(Math.max(e.clientX-rect.left,40),rect.width-40);
+    tip.style.left=x+'px';
+  }
+}
+function yHdrLeave(si){
+  const tip=document.getElementById(`yhdr-tip-${si}`);
   if(tip) tip.style.display='none';
 }
 
