@@ -1155,16 +1155,7 @@
         }
         .slit-sub-field input { font-size: 12px; padding: 5px 8px; background: #f8fafc; color: #64748b; }
         .slit-sub-field input:not(:disabled) { background: white; color: #1e293b; }
-        /* ป้องกัน .form-control:focus !important ยิงทับ disabled inputs */
-        .slit-sub-field input:disabled,
-        .slit-sub-field input[readonly] {
-            background: #f1f5f9 !important;
-            color: #94a3b8 !important;
-            border-color: #e2e8f0 !important;
-            box-shadow: none !important;
-            cursor: not-allowed !important;
-            pointer-events: none;
-        }
+
         .badge-auto-slit {
             font-size: 9px; color: #059669;
             background: rgba(5,150,105,0.1); border: 1px solid rgba(5,150,105,0.25);
@@ -6160,18 +6151,16 @@ function updateLegendDisplay(index, log) {
                 </div>
                 <div class="slit-row-bottom">
                     <div class="slit-sub-field">
-                        <label>ไซต์ <span class="badge-auto-slit">auto</span></label>
+                        <label>ไซต์ <span class="badge-auto-slit">อนาคต</span></label>
                         <input type="text" class="form-control slit-site-input"
                                placeholder="เช่น 100x100" value="${defSite}"
-                               disabled readonly tabindex="-1"
-                               style="background:#f1f5f9;color:#94a3b8;cursor:not-allowed;pointer-events:none;">
+                               oninput="updateSlitPreview()">
                     </div>
                     <div class="slit-sub-field">
-                        <label>น้ำหนัก (kg) <span class="badge-auto-slit">auto</span></label>
-                        <input type="text" class="form-control slit-weight-input"
-                               placeholder="รอ auto" value="${defWeight}"
-                               disabled readonly tabindex="-1"
-                               style="background:#f1f5f9;color:#94a3b8;cursor:not-allowed;pointer-events:none;">
+                        <label>น้ำหนัก (kg) <span class="badge-auto-slit">อนาคต</span></label>
+                        <input type="number" class="form-control slit-weight-input"
+                               placeholder="0.00" value="${defWeight}" step="0.01" min="0"
+                               oninput="updateSlitPreview()">
                     </div>
                     <div class="slit-sub-field">
                         <label>หมายเหตุ</label>
@@ -6205,11 +6194,13 @@ function updateLegendDisplay(index, log) {
             rowCards.forEach((card, i) => {
                 const w       = parseFloat(card.querySelector('.slit-width-input')?.value) || 0;
                 const station = (card.querySelector('.slit-station-input')?.value || '').trim();
+                const site    = (card.querySelector('.slit-site-input')?.value || '').trim();
+                const weight  = (card.querySelector('.slit-weight-input')?.value || '').trim();
                 const note    = (card.querySelector('.slit-note-input')?.value || '').trim();
                 if (w <= 0) return;
                 total += w;
-                // format: "430[SM01|||note]" — site & weight ว่างไว้ก่อน (auto อนาคต)
-                const meta = [station, '', '', note].join('|').replace(/\|+$/, '');
+                // format: "430[station|site|weight|note]" — ตัดท้าย | ที่ว่างออก
+                const meta = [station, site, weight, note].join('|').replace(/\|+$/, '');
                 combinedData.push(meta ? `${w}[${meta}]` : `${w}`);
             });
 
