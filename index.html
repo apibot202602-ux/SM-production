@@ -1155,6 +1155,16 @@
         }
         .slit-sub-field input { font-size: 12px; padding: 5px 8px; background: #f8fafc; color: #64748b; }
         .slit-sub-field input:not(:disabled) { background: white; color: #1e293b; }
+        /* ป้องกัน .form-control:focus !important ยิงทับ disabled inputs */
+        .slit-sub-field input:disabled,
+        .slit-sub-field input[readonly] {
+            background: #f1f5f9 !important;
+            color: #94a3b8 !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: none !important;
+            cursor: not-allowed !important;
+            pointer-events: none;
+        }
         .badge-auto-slit {
             font-size: 9px; color: #059669;
             background: rgba(5,150,105,0.1); border: 1px solid rgba(5,150,105,0.25);
@@ -6152,12 +6162,16 @@ function updateLegendDisplay(index, log) {
                     <div class="slit-sub-field">
                         <label>ไซต์ <span class="badge-auto-slit">auto</span></label>
                         <input type="text" class="form-control slit-site-input"
-                               placeholder="เช่น 100x100" value="${defSite}" disabled>
+                               placeholder="เช่น 100x100" value="${defSite}"
+                               disabled readonly tabindex="-1"
+                               style="background:#f1f5f9;color:#94a3b8;cursor:not-allowed;pointer-events:none;">
                     </div>
                     <div class="slit-sub-field">
                         <label>น้ำหนัก (kg) <span class="badge-auto-slit">auto</span></label>
                         <input type="text" class="form-control slit-weight-input"
-                               placeholder="รอ auto" value="${defWeight}" disabled>
+                               placeholder="รอ auto" value="${defWeight}"
+                               disabled readonly tabindex="-1"
+                               style="background:#f1f5f9;color:#94a3b8;cursor:not-allowed;pointer-events:none;">
                     </div>
                     <div class="slit-sub-field">
                         <label>หมายเหตุ</label>
@@ -6178,10 +6192,13 @@ function updateLegendDisplay(index, log) {
         }
 
         function updateSlitPreview() {
-            const stripWidth = parseFloat(document.getElementById('new-strip-width')?.value) || 0;
+            const stripEl = document.getElementById('new-strip-width');
+            if (!stripEl) return; // modal ยังไม่ถูก render
+            const stripWidth = parseFloat(stripEl.value) || 0;
 
-            // ดึงข้อมูลจากทุก slit-row-card
-            const rowCards = document.querySelectorAll('.slit-row-card');
+            // ดึงข้อมูลจากทุก slit-row-card ใน container เท่านั้น (ไม่ชนกับ card อื่นในหน้า)
+            const slitContainer = document.getElementById('slit-rows-container');
+            const rowCards = slitContainer ? slitContainer.querySelectorAll('.slit-row-card') : [];
             let combinedData = [];
             let total = 0;
 
