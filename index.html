@@ -1128,6 +1128,38 @@
         .nd-card-clickable:hover {
             box-shadow: 0 0 0 2px #4361ee55 !important;
         }
+
+        /* ── Slit Plan: Trim rows (locked) ── */
+        .slit-trim-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; border-radius: 8px;
+            background: #f8fafc; border: 1px dashed #e2e8f0;
+            margin-bottom: 6px; font-size: 12px;
+        }
+        .slit-trim-row.trim-over { background: #fef2f2; border-color: #fca5a5; }
+        .slit-trim-label { flex: 1; color: #64748b; font-weight: 600; }
+        .slit-trim-hint  { font-weight: 400; color: #94a3b8; font-size: 10px; }
+        .slit-trim-val   { font-weight: 700; color: #475569; min-width: 60px; text-align: right; }
+        .slit-trim-row.trim-over .slit-trim-val { color: #dc2626; }
+
+        /* ── Slit Plan: Slit rows (new 2-line layout) ── */
+        .slit-row-card {
+            border: 1px solid #f1f5f9; border-radius: 10px;
+            padding: 8px 10px; margin-bottom: 7px; background: #fafafa;
+        }
+        .slit-row-top    { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+        .slit-row-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .slit-sub-field label {
+            font-size: 10px; color: #94a3b8; font-weight: 700;
+            text-transform: uppercase; display: block; margin-bottom: 3px;
+        }
+        .slit-sub-field input { font-size: 12px; padding: 5px 8px; background: #f8fafc; color: #64748b; }
+        .slit-sub-field input:not(:disabled) { background: white; color: #1e293b; }
+        .badge-auto-slit {
+            font-size: 9px; color: #059669;
+            background: rgba(5,150,105,0.1); border: 1px solid rgba(5,150,105,0.25);
+            border-radius: 4px; padding: 1px 5px; font-weight: 700; margin-left: 3px;
+        }
 </style>
   </head>
   <body>
@@ -2189,8 +2221,29 @@
                       </button>
                   </div>
 
+                  <!-- Trim ซ้าย (auto, locked) -->
+                  <div class="slit-trim-row" id="slit-trim-left">
+                      <i class="fa-solid fa-angles-left" style="font-size:10px;color:#94a3b8;"></i>
+                      <span class="slit-trim-label">Trim ซ้าย <span class="slit-trim-hint">(คำนวณอัตโนมัติ)</span></span>
+                      <span class="slit-trim-val" id="slit-trim-left-val">—</span>
+                      <i class="fa-solid fa-lock" style="font-size:10px;color:#94a3b8;"></i>
+                  </div>
+
                   <!-- แถวซอยที่สร้างด้วย JS -->
                   <div id="slit-rows-container"></div>
+
+                  <!-- Trim ขวา (auto, locked) -->
+                  <div class="slit-trim-row" id="slit-trim-right">
+                      <i class="fa-solid fa-angles-right" style="font-size:10px;color:#94a3b8;"></i>
+                      <span class="slit-trim-label">Trim ขวา <span class="slit-trim-hint">(คำนวณอัตโนมัติ)</span></span>
+                      <span class="slit-trim-val" id="slit-trim-right-val">—</span>
+                      <i class="fa-solid fa-lock" style="font-size:10px;color:#94a3b8;"></i>
+                  </div>
+
+                  <!-- แจ้งเตือนเกิน strip -->
+                  <div id="slit-over-warn" class="small fw-bold text-danger mt-1 px-1" style="display:none;">
+                      <i class="fa-solid fa-triangle-exclamation me-1"></i>ผลรวม slit เกินหน้าแถบรวม — กรุณาปรับขนาด
+                  </div>
 
                   <!-- Preview แถบสีแสดงสัดส่วน -->
                   <div id="slit-preview-bar" class="mt-2" style="display:none;">
@@ -6059,39 +6112,64 @@ function updateLegendDisplay(index, log) {
             const idx = slitRowCount++;
             const color = SLIT_COLORS[idx % SLIT_COLORS.length];
 
+            // parse defaultNote: format ใหม่ "station|site|weight|note"
+            // format เก่า (free text) → ใส่ใน note field (backward compat)
+            let defStation = '', defSite = '', defWeight = '', defNoteOnly = '';
+            if (defaultNote.includes('|')) {
+                const parts = defaultNote.split('|');
+                defStation  = parts[0] || '';
+                defSite     = parts[1] || '';
+                defWeight   = parts[2] || '';
+                defNoteOnly = parts[3] || '';
+            } else {
+                defNoteOnly = defaultNote;
+            }
+
             const row = document.createElement('div');
-            row.className = 'd-flex align-items-center gap-2 mb-2';
+            row.className = 'slit-row-card';
             row.id = `slit-row-${idx}`;
             row.innerHTML = `
-                <div class="rounded-circle flex-shrink-0" 
-                    style="width:12px; height:12px; background:${color};"></div>
-                
-                <!-- ช่องใส่ขนาด -->
-                <div class="input-group input-group-sm" style="max-width: 110px;">
-                    <input type="number" class="form-control fw-bold text-center slit-width-input"
-                          placeholder="ขนาด" value="${defaultVal}"
-                          oninput="updateSlitPreview()" min="0.01" step="0.01">
-                    <span class="input-group-text px-1" style="font-size:10px;">mm</span>
+                <div class="slit-row-top">
+                    <div class="rounded-circle flex-shrink-0"
+                        style="width:11px;height:11px;background:${color};"></div>
+                    <div class="input-group input-group-sm flex-shrink-0" style="max-width:105px;">
+                        <input type="number" class="form-control fw-bold text-center slit-width-input"
+                               placeholder="ขนาด" value="${defaultVal}"
+                               oninput="updateSlitPreview()" min="0.01" step="0.01">
+                        <span class="input-group-text px-1" style="font-size:10px;">mm</span>
+                    </div>
+                    <input type="text" class="form-control form-control-sm slit-station-input flex-grow-1"
+                           placeholder="Next Station เช่น SM01"
+                           value="${defStation}"
+                           oninput="updateSlitPreview()"
+                           style="font-size:12px;">
+                    <button type="button" class="btn btn-sm btn-light border text-danger px-2 flex-shrink-0"
+                            onclick="removeSlitRow('slit-row-${idx}')">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
-
-                <!-- ช่องใส่ Note (จุดที่เกิด Error เมื่อกี้) -->
-                <input type="text" class="form-control form-control-sm slit-note-input" 
-                      placeholder="Note / Next Station..." 
-                      value="${defaultNote}"
-                      oninput="updateSlitPreview()"
-                      style="font-size: 11px; border-color: #f8bbd0;">
-
-                <!-- ปุ่มลบ -->
-                <button type="button" class="btn btn-sm btn-light border text-danger px-1"
-                        onclick="removeSlitRow('slit-row-${idx}')">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <div class="slit-row-bottom">
+                    <div class="slit-sub-field">
+                        <label>ไซต์ <span class="badge-auto-slit">auto</span></label>
+                        <input type="text" class="form-control slit-site-input"
+                               placeholder="เช่น 100x100" value="${defSite}" disabled>
+                    </div>
+                    <div class="slit-sub-field">
+                        <label>น้ำหนัก (kg) <span class="badge-auto-slit">auto</span></label>
+                        <input type="text" class="form-control slit-weight-input"
+                               placeholder="รอ auto" value="${defWeight}" disabled>
+                    </div>
+                    <div class="slit-sub-field">
+                        <label>หมายเหตุ</label>
+                        <input type="text" class="form-control slit-note-input"
+                               placeholder="Note..." value="${defNoteOnly}"
+                               oninput="updateSlitPreview()">
+                    </div>
+                </div>
             `;
             container.appendChild(row);
             updateSlitPreview();
-
-            // Focus ช่องใหม่ทันที
-            row.querySelector('input').focus();
+            row.querySelector('.slit-width-input').focus();
         }
 
         function removeSlitRow(rowId) {
@@ -6101,82 +6179,90 @@ function updateLegendDisplay(index, log) {
 
         function updateSlitPreview() {
             const stripWidth = parseFloat(document.getElementById('new-strip-width')?.value) || 0;
-            const widthInputs = document.querySelectorAll('.slit-width-input');
-            const noteInputs = document.querySelectorAll('.slit-note-input'); // ดึงช่อง Note
-            
+
+            // ดึงข้อมูลจากทุก slit-row-card
+            const rowCards = document.querySelectorAll('.slit-row-card');
             let combinedData = [];
             let total = 0;
 
-            widthInputs.forEach((el, i) => {
-                const w = parseFloat(el.value) || 0;
-                const note = noteInputs[i] ? noteInputs[i].value.trim() : "";
-                
-                if (w > 0) {
-                    total += w;
-                    // รวมข้อมูลในรูปแบบ "430[Note]" ถ้าไม่มีโน้ตจะเหลือแค่ "430"
-                    const valueString = note ? `${w}[${note}]` : `${w}`;
-                    combinedData.push(valueString);
-                }
+            rowCards.forEach((card, i) => {
+                const w       = parseFloat(card.querySelector('.slit-width-input')?.value) || 0;
+                const station = (card.querySelector('.slit-station-input')?.value || '').trim();
+                const note    = (card.querySelector('.slit-note-input')?.value || '').trim();
+                if (w <= 0) return;
+                total += w;
+                // format: "430[SM01|||note]" — site & weight ว่างไว้ก่อน (auto อนาคต)
+                const meta = [station, '', '', note].join('|').replace(/\|+$/, '');
+                combinedData.push(meta ? `${w}[${meta}]` : `${w}`);
             });
 
-            const scrap = stripWidth > 0 ? stripWidth - total : null;
+            // ── Trim calculation ─────────────────────────────────────────────
+            const scrap  = stripWidth > 0 ? stripWidth - total : null;
+            const trim   = scrap !== null && scrap >= 0 ? scrap / 2 : null;
+            const isOver = scrap !== null && scrap < 0;
 
-            // อัปเดต hidden input สำหรับส่งไปบันทึก (เป็น string เช่น "430[งานด่วน],430[เก็บสต็อก]")
+            // update trim row labels
+            const fmtTrim = v => v === 0 ? '0 mm' : `${parseFloat(v.toFixed(2))} mm`;
+            const trimLEl = document.getElementById('slit-trim-left-val');
+            const trimREl = document.getElementById('slit-trim-right-val');
+            const trimLRow = document.getElementById('slit-trim-left');
+            const trimRRow = document.getElementById('slit-trim-right');
+
+            if (trimLEl) trimLEl.textContent = trim !== null ? fmtTrim(trim) : '—';
+            if (trimREl) trimREl.textContent = trim !== null ? fmtTrim(trim) : '—';
+            [trimLRow, trimRRow].forEach(el => {
+                if (!el) return;
+                el.classList.toggle('trim-over', isOver);
+            });
+
+            // warn box
+            const warnEl = document.getElementById('slit-over-warn');
+            if (warnEl) warnEl.style.display = isOver ? 'block' : 'none';
+
+            // ── sync hidden input ────────────────────────────────────────────
             document.getElementById('new-slit-plan-value').value = combinedData.join(',');
 
+            // ── preview bar ──────────────────────────────────────────────────
             const previewBar = document.getElementById('slit-preview-bar');
-            if (combinedData.length === 0) {
-                previewBar.style.display = 'none';
-                return;
-            }
+            if (combinedData.length === 0) { previewBar.style.display = 'none'; return; }
             previewBar.style.display = 'block';
 
-            // วาด color bar สัดส่วน
+            const base = stripWidth > 0 ? stripWidth : (total || 1);
             const colorBar = document.getElementById('slit-color-bar');
-            if (stripWidth > 0 && total > 0) {
-                const segments = combinedData.map((dataStr, i) => {
-                    const w = parseFloat(dataStr); // parseFloat จะดึงแค่ตัวเลขหน้า [ ออกมาอัตโนมัติ
-                    const pct = (w / stripWidth * 100).toFixed(1);
-                    const color = SLIT_COLORS[i % SLIT_COLORS.length];
-                    return `<div style="width:${pct}%; background:${color}; 
-                                display:flex; align-items:center; justify-content:center;
-                                font-size:9px; color:white; font-weight:bold; overflow:hidden;"
-                                title="${dataStr} mm">${w}</div>`;
-                });
+            let barHTML = '';
 
-                if (scrap > 0) {
-                    const scrapPct = (scrap / stripWidth * 100).toFixed(1);
-                    segments.push(`<div style="width:${scrapPct}%; background:#e2e8f0;
-                                        display:flex; align-items:center; justify-content:center;
-                                        font-size:9px; color:#94a3b8;" title="Scrap ${scrap.toFixed(1)}mm">scrap</div>`);
-                }
-                colorBar.innerHTML = segments.join('');
-            } else {
-                colorBar.innerHTML = combinedData.map((dataStr, i) => {
-                    const w = parseFloat(dataStr);
-                    const pct = (w / (total || 1) * 100).toFixed(1);
-                    return `<div style="width:${pct}%; background:${SLIT_COLORS[i % SLIT_COLORS.length]};
-                                display:flex; align-items:center; justify-content:center;
-                                font-size:9px; color:white; font-weight:bold;">${w}</div>`;
-                }).join('');
+            // trim ซ้าย
+            if (trim > 0) {
+                const pct = (trim / base * 100).toFixed(1);
+                barHTML += `<div style="width:${pct}%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#94a3b8;overflow:hidden;" title="Trim ซ้าย ${fmtTrim(trim)}">◀${parseFloat(trim.toFixed(1))}</div>`;
             }
+            // slit segments
+            combinedData.forEach((dataStr, i) => {
+                const w = parseFloat(dataStr);
+                const pct = (w / base * 100).toFixed(1);
+                const color = SLIT_COLORS[i % SLIT_COLORS.length];
+                barHTML += `<div style="width:${pct}%;background:${color};display:flex;align-items:center;justify-content:center;font-size:9px;color:white;font-weight:bold;overflow:hidden;" title="${w} mm">${w}</div>`;
+            });
+            // trim ขวา
+            if (trim > 0) {
+                const pct = (trim / base * 100).toFixed(1);
+                barHTML += `<div style="width:${pct}%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#94a3b8;overflow:hidden;" title="Trim ขวา ${fmtTrim(trim)}">${parseFloat(trim.toFixed(1))}▶</div>`;
+            }
+            colorBar.innerHTML = barHTML;
 
-            // อัปเดต Label สรุปยอด
-            document.getElementById('slit-sum-label').textContent = `รวม: ${total.toFixed(1)} mm`;
+            // labels
+            document.getElementById('slit-sum-label').textContent =
+                stripWidth > 0
+                    ? `Slit รวม: ${total.toFixed(1)} mm  |  Strip: ${stripWidth} mm`
+                    : `รวม: ${total.toFixed(1)} mm`;
+
             const scrapEl = document.getElementById('slit-scrap-label');
-            
             if (scrap !== null) {
-                const isOver = scrap < 0;
-                scrapEl.textContent = isOver ? `เกิน: ${Math.abs(scrap).toFixed(1)} mm` : `Scrap: ${scrap.toFixed(1)} mm`;
-                // เปลี่ยนสี: เขียวถ้าพอดี/เหลือ, แดงถ้าเกิน
-                scrapEl.className = `fw-bold small ${isOver ? 'text-danger' : 'text-success'}`;
-                
-                // ถ้ายอดเกิน ให้ทำกรอบสีแดงแจ้งเตือน
-                const scrapContainer = document.getElementById('slit-scrap-container');
-                if (scrapContainer) {
-                    scrapContainer.style.borderColor = isOver ? "#ef4444" : "#10b981";
-                    scrapContainer.style.backgroundColor = isOver ? "#fef2f2" : "#f0fdf4";
-                }
+                const isOverLabel = scrap < 0;
+                scrapEl.textContent = isOverLabel
+                    ? `เกิน: ${Math.abs(scrap).toFixed(1)} mm`
+                    : trim === 0 ? 'ใช้ Strip เต็ม 100%' : `Trim แต่ละฝั่ง: ${fmtTrim(trim)}`;
+                scrapEl.className = `fw-bold small ${isOverLabel ? 'text-danger' : 'text-success'}`;
             } else {
                 scrapEl.textContent = '';
             }
@@ -6192,6 +6278,16 @@ function updateLegendDisplay(index, log) {
             if (hidden) hidden.value = '';
             const stripInput = document.getElementById('new-strip-width');
             if (stripInput) stripInput.value = '';
+            // reset trim labels
+            const tl = document.getElementById('slit-trim-left-val');
+            const tr = document.getElementById('slit-trim-right-val');
+            if (tl) tl.textContent = '—';
+            if (tr) tr.textContent = '—';
+            ['slit-trim-left','slit-trim-right'].forEach(id => {
+                document.getElementById(id)?.classList.remove('trim-over');
+            });
+            const warn = document.getElementById('slit-over-warn');
+            if (warn) warn.style.display = 'none';
         }
 
     
@@ -6604,6 +6700,3 @@ function updateLegendDisplay(index, log) {
 </div>
 </body>
 </html>
-
-
-
