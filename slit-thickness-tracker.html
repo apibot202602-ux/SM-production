@@ -1456,9 +1456,21 @@ function buildSlitsFromJob(job,invSlits){
   if(!plan) return [];
   const items=plan.split(',').map((item,i)=>{
     const wm=item.match(/^([0-9.]+)/);
-    const nm=item.match(/\[(.*?)\]/);
-    return { slitId:`${job.jobId}-S${i+1}`, width:wm?parseFloat(wm[1]):0,
-             note:nm?nm[1]:'', color:SLIT_COLORS[i%SLIT_COLORS.length] };
+    const mm=item.match(/\[(.*?)\]/);
+    const meta=mm?mm[1]:'';
+    const parts=meta.split('|');
+    // format ใหม่: station|site|weight|note
+    // format เก่า: free-text → ใส่ใน note
+    const isNewFmt=meta.includes('|');
+    return {
+      slitId   : `${job.jobId}-S${i+1}`,
+      width    : wm?parseFloat(wm[1]):0,
+      color    : SLIT_COLORS[i%SLIT_COLORS.length],
+      station  : isNewFmt?(parts[0]||''):'',
+      site     : isNewFmt?(parts[1]||''):'',
+      planWeight: isNewFmt?(parts[2]||''):'',
+      note     : isNewFmt?(parts[3]||''):meta,
+    };
   }).filter(s=>s.width>0);
   if(invSlits.length>0) items.forEach((s,i)=>{ if(invSlits[i]) s.slitId=invSlits[i].slitId||s.slitId; });
   return items;
@@ -2309,10 +2321,18 @@ function yBuildSlitBlock(s,si){
     <div class="yield-slit-hdr" onclick="yToggle(${si})" style="flex-wrap:nowrap;min-width:0;">
       <div class="yield-dot" style="background:${s.color};flex-shrink:0;"></div>
       <div class="yield-slit-label" style="color:${s.color};flex-shrink:0;">S${si+1}</div>
-      <div class="yield-slit-meta" style="flex-shrink:0;white-space:nowrap;">
-        ${s.width}mm
-        ${coilW!=null?` · <b>${coilW.toLocaleString()}</b> kg`:''}
-        ${coilL!=null?` · ≈ <b>${coilL.toFixed(0)}</b> m`:''}
+      <div class="yield-slit-meta" style="flex-shrink:0;min-width:0;">
+        <span style="white-space:nowrap;">
+          ${s.width}mm
+          ${coilW!=null?` · <b>${coilW.toLocaleString()}</b> kg`:''}
+          ${coilL!=null?` · ≈ <b>${coilL.toFixed(0)}</b> m`:''}
+        </span>
+        ${(s.station||s.site||s.planWeight)?`
+        <span style="display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">
+          ${s.station?`<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-size:.58rem;font-weight:700;margin-right:3px;">→ ${s.station}</span>`:''}
+          ${s.site?`<span style="background:#f0fdf4;color:#15803d;border-radius:4px;padding:1px 6px;font-size:.58rem;font-weight:700;margin-right:3px;">${s.site}</span>`:''}
+          ${s.planWeight?`<span style="background:#fef9c3;color:#854d0e;border-radius:4px;padding:1px 6px;font-size:.58rem;font-weight:700;">${s.planWeight} kg</span>`:''}
+        </span>`:''}
       </div>
       <!-- header mini strip (แสดงเฉพาะตอนปิด) -->
       <div class="yield-hdr-strip-wrap" id="yhdr-wrap-${si}" onclick="event.stopPropagation();yToggle(${si})">
@@ -2333,6 +2353,20 @@ function yBuildSlitBlock(s,si){
       <i class="fa-solid fa-chevron-down yield-chevron" style="flex-shrink:0;"></i>
     </div>
     <div class="yield-slit-body">
+
+      <!-- ⓪ Plan metadata (station / site / weight / note) -->
+      ${(s.station||s.site||s.planWeight||s.note)?`
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:7px 10px;
+        background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;font-size:.65rem;">
+        ${s.station?`<span><span style="color:#94a3b8;font-weight:700;">Next Station</span>&nbsp;
+          <span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 7px;font-weight:700;">→ ${s.station}</span></span>`:''}
+        ${s.site?`<span><span style="color:#94a3b8;font-weight:700;">ไซต์</span>&nbsp;
+          <span style="background:#f0fdf4;color:#15803d;border-radius:4px;padding:1px 7px;font-weight:700;">${s.site}</span></span>`:''}
+        ${s.planWeight?`<span><span style="color:#94a3b8;font-weight:700;">น้ำหนัก</span>&nbsp;
+          <span style="background:#fef9c3;color:#854d0e;border-radius:4px;padding:1px 7px;font-weight:700;">${s.planWeight} kg</span></span>`:''}
+        ${s.note?`<span><span style="color:#94a3b8;font-weight:700;">Note</span>&nbsp;
+          <span style="color:#475569;">${s.note}</span></span>`:''}
+      </div>`:''}
 
       <!-- ① Product type -->
       <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;
