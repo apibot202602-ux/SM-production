@@ -2930,9 +2930,11 @@ function updateLegendDisplay(index, log) {
             const cleanPlan = String(l.slitPlan || '').replace(/^'/, '');
             if (cleanPlan) {
                 cleanPlan.split(',').forEach(item => {
-                    const wm = item.match(/^([0-9.]+)/);
-                    const nm = item.match(/\[(.*?)\]/);
-                    if (wm) addRecordSlitRow(wm[1], nm ? nm[1] : '');
+                    const p = parseSlitItem(item);
+                    if (p.w) {
+                        const meta = [p.station, p.site, p.weight, p.note].join('|').replace(/\|+$/, '');
+                        addRecordSlitRow(p.w, meta);
+                    }
                 });
             }
 
@@ -5426,18 +5428,20 @@ function updateLegendDisplay(index, log) {
             // Slit Plan — โหลดเฉพาะม้วนใหม่เท่านั้น
             if (!isEdit) {
                 const slitInput = document.getElementById('input-slit-plan');
-                const masterPlan = String(CURRENT_JOB_INFO.slitPlan || '').replace(/^'/, '').replace(/\[.*?\]/g, '').trim();
+                const masterPlan = String(CURRENT_JOB_INFO.slitPlan || '').replace(/^'/, '').trim();
                 const stripWidth = Number(CURRENT_JOB_INFO.stripWidth || 0);
 
                 if (masterPlan) {
                     // clear rows เดิม
                     document.getElementById('record-slit-rows').innerHTML = '';
                     recordSlitCount = 0;
-                    // parse แต่ละเส้นแล้วสร้าง row
+                    // parse แต่ละเส้นพร้อม metadata ทั้งหมด
                     masterPlan.split(',').forEach(item => {
-                        const wm = item.match(/^([0-9.]+)/);
-                        const nm = item.match(/\[(.*?)\]/);
-                        if (wm) addRecordSlitRow(wm[1], nm ? nm[1] : '');
+                        const p = parseSlitItem(item);
+                        if (p.w) {
+                            const meta = [p.station, p.site, p.weight, p.note].join('|').replace(/\|+$/, '');
+                            addRecordSlitRow(p.w, meta);
+                        }
                     });
           
                     if (stripWidth > 0) {
@@ -6007,52 +6011,105 @@ function updateLegendDisplay(index, log) {
 
         let recordSlitCount = 0;
 
-        function addRecordSlitRow(defaultVal = '', defaultNote = '') {
+        // parse slit plan item "430[SM01|site|weight|note]" → fields object
+        function parseSlitItem(item) {
+            const wm = item.match(/^([0-9.]+)/);
+            const mm = item.match(/\[(.*?)\]/);
+            const w  = wm ? wm[1] : '';
+            const parts = mm ? mm[1].split('|') : [];
+            return {
+                w,
+                station : parts[0] || '',
+                site    : parts[1] || '',
+                weight  : parts[2] || '',
+                note    : parts[3] || (mm ? '' : (mm === null && parts.length === 0 ? '' : '')),
+            };
+        }
+
+        function addRecordSlitRow(defaultVal = '', defaultMeta = '') {
             const container = document.getElementById('record-slit-rows');
             const idx = recordSlitCount++;
             const color = SLIT_COLORS[idx % SLIT_COLORS.length];
+
+            // defaultMeta อาจเป็น format ใหม่ "station|site|weight|note"
+            // หรือ format เก่า free-text → ใส่ใน station (backward compat)
+            let defStation = '', defSite = '', defWeight = '', defNote = '';
+            if (defaultMeta.includes('|')) {
+                const parts = defaultMeta.split('|');
+                defStation = parts[0] || '';
+                defSite    = parts[1] || '';
+                defWeight  = parts[2] || '';
+                defNote    = parts[3] || '';
+            } else {
+                defStation = defaultMeta; // เก่า → Next Station
+            }
+
             const row = document.createElement('div');
-            row.className = 'mb-2 w-100';
+            row.className = 'slit-row-card';
             row.id = `record-slit-row-${idx}`;
             row.innerHTML = `
-                <div class="d-flex align-items-center gap-1">
+                <div class="slit-row-top">
                     <div class="rounded-circle flex-shrink-0"
-                        style="width:10px;height:10px;background:${color};"></div>
-                    <div class="input-group input-group-sm flex-shrink-0" style="width:95px;">
+                        style="width:11px;height:11px;background:${color};"></div>
+                    <div class="input-group input-group-sm flex-shrink-0" style="max-width:105px;">
                         <input type="number" class="form-control fw-bold text-center record-slit-width"
                                placeholder="ขนาด" value="${defaultVal}"
-                               oninput="updateRecordSlitPreview()" min="1" step="1">
+                               oninput="updateRecordSlitPreview()" min="0.01" step="0.01">
                         <span class="input-group-text px-1" style="font-size:10px;">mm</span>
                     </div>
-                    <input type="text" class="form-control form-control-sm record-slit-note"
-                           placeholder="Next Station..."
-                           value="${defaultNote}"
+                    <input type="text" class="form-control form-control-sm record-slit-station flex-grow-1"
+                           placeholder="Next Station เช่น SM01"
+                           value="${defStation}"
                            oninput="updateRecordSlitPreview()"
-                           style="font-size:11px;border-color:#f8bbd0;min-width:0;">
+                           style="font-size:12px;">
                     <button type="button" class="btn btn-sm btn-light border text-danger px-2 flex-shrink-0"
                             onclick="document.getElementById('record-slit-row-${idx}').remove(); updateRecordSlitPreview();">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+                </div>
+                <div class="slit-row-bottom">
+                    <div class="slit-sub-field">
+                        <label>ไซต์ <span class="badge-auto-slit">อนาคต</span></label>
+                        <input type="text" class="form-control record-slit-site"
+                               placeholder="เช่น 100x100" value="${defSite}"
+                               oninput="updateRecordSlitPreview()">
+                    </div>
+                    <div class="slit-sub-field">
+                        <label>น้ำหนัก (kg) <span class="badge-auto-slit">อนาคต</span></label>
+                        <input type="number" class="form-control record-slit-weight"
+                               placeholder="0.00" value="${defWeight}" step="0.01" min="0"
+                               oninput="updateRecordSlitPreview()">
+                    </div>
+                    <div class="slit-sub-field">
+                        <label>หมายเหตุ</label>
+                        <input type="text" class="form-control record-slit-note"
+                               placeholder="Note..." value="${defNote}"
+                               oninput="updateRecordSlitPreview()">
+                    </div>
                 </div>`;
             container.appendChild(row);
             updateRecordSlitPreview();
-            row.querySelector('input').focus();
+            row.querySelector('.record-slit-width').focus();
         }
 
         function updateRecordSlitPreview() {
             const stripWidth = parseFloat(document.getElementById('record-strip-width')?.value)
                             || Number(CURRENT_JOB_INFO?.stripWidth || 0);
-            const widthInputs = document.querySelectorAll('.record-slit-width');
-            const noteInputs  = document.querySelectorAll('.record-slit-note');
+            // scope ใน #record-slit-rows เท่านั้น
+            const recContainer = document.getElementById('record-slit-rows');
+            const rowCards = recContainer ? recContainer.querySelectorAll('.slit-row-card') : [];
             let combined = [], total = 0;
 
-            widthInputs.forEach((el, i) => {
-                const w    = parseFloat(el.value) || 0;
-                const note = noteInputs[i] ? noteInputs[i].value.trim() : '';
-                if (w > 0) {
-                    total += w;
-                    combined.push(note ? `${w}[${note}]` : `${w}`);
-                }
+            rowCards.forEach((card, i) => {
+                const w       = parseFloat(card.querySelector('.record-slit-width')?.value) || 0;
+                const station = (card.querySelector('.record-slit-station')?.value || '').trim();
+                const site    = (card.querySelector('.record-slit-site')?.value || '').trim();
+                const weight  = (card.querySelector('.record-slit-weight')?.value || '').trim();
+                const note    = (card.querySelector('.record-slit-note')?.value || '').trim();
+                if (w <= 0) return;
+                total += w;
+                const meta = [station, site, weight, note].join('|').replace(/\|+$/, '');
+                combined.push(meta ? `${w}[${meta}]` : `${w}`);
             });
 
             // อัปเดต hidden input
