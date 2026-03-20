@@ -754,6 +754,34 @@ body{background:var(--bg);font-family:'Sarabun',sans-serif;color:#1e293b;font-si
       </div>
     </div>
   </div>
+
+  <!-- ════ Predict-Yield Section ════ -->
+  <div id="pred-yield-card" class="card" style="margin-top:8px;display:none;">
+    <div class="card-hdr">
+      <i class="fa-solid fa-weight-hanging me-1"></i>Yield — ประมาณการผลิตจากแผนนี้
+      <span style="font-size:.62rem;font-weight:400;opacity:.75;margin-left:8px;">ใช้ความหนาจากการทำนาย</span>
+    </div>
+    <div class="card-body" style="padding:10px 0 0;">
+      <!-- library coil length input -->
+      <div style="display:flex;align-items:center;gap:8px;padding:0 14px 10px;flex-wrap:wrap;">
+        <span style="font-size:.72rem;color:#64748b;font-weight:700;">ความยาวม้วน (m)</span>
+        <div style="display:flex;align-items:center;gap:0;">
+          <input type="number" id="py-coil-length" value="250" min="1" step="1"
+            style="width:80px;text-align:center;font-size:.85rem;font-weight:700;
+              border:1.5px solid #e2e8f0;border-radius:8px 0 0 8px;padding:6px 8px;"
+            oninput="pyRefreshAll()">
+          <span style="background:#f8fafc;border:1.5px solid #e2e8f0;border-left:none;
+            border-radius:0 8px 8px 0;padding:6px 8px;font-size:.75rem;color:#64748b;">m</span>
+        </div>
+        <span style="font-size:.65rem;color:#94a3b8;">จากความยาวม้วน Library</span>
+      </div>
+      <!-- per-slit accordion blocks -->
+      <div id="py-slits-container"></div>
+      <!-- overall summary -->
+      <div class="yield-summary-grid" id="py-sum-grid" style="margin:8px 14px 10px;"></div>
+      <div class="yield-chip-row" id="py-chip-row" style="margin:0 14px 14px;"></div>
+    </div>
+  </div>
 </div></div><!-- /page -->
 
 <!-- ════════════════════════════════════ TAB: YIELD ════ -->
@@ -1014,6 +1042,9 @@ function runPrediction(){
       }
     }
   });
+
+  // ── Predict-Yield: ส่ง thickness ที่ interpolate แล้วเข้า engine ──
+  renderPredictYield(slits, posData);
 }
 
 
@@ -3209,6 +3240,622 @@ function yRenderPipeChart(si){
   if(safeEl) safeEl.textContent=`${pipes.length} เส้น | OK ${nOk} | Out ${nOut}`;
 }
 
+
+// ============================================================
+// PREDICT-YIELD ENGINE  (namespace: py / PY_)
+// ใช้ thickness จาก runPrediction posData แทน SLIT_DATA
+// ============================================================
+const PY_CFG    = {};   // per-slit config  (เหมือน YIELD_CFG)
+const PY_OPEN   = {};   // accordion state
+const PY_CHARTS = {};   // Chart.js instances
+
+// thickness map สำหรับ predict — เก็บระหว่าง runPrediction
+// pyThkMap[si] = { H:v, HM:v, M:v, MT:v, T:v }
+let pyThkMap = {};
+let pySlits  = [];  // [{id,width,color}] copy จาก runPrediction
+
+// ── helpers ──────────────────────────────────────────────────
+function pyGetThkMap(si){ return pyThkMap[si]||{}; }
+
+function pyGetAvgThk(si){
+  const m=pyGetThkMap(si);
+  const vals=Object.values(m).filter(v=>v!=null);
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+}
+
+function pyCoilLength(){
+  return parseFloat(document.getElementById('py-coil-length')?.value)||250;
+}
+
+function pyGetSpec(si){
+  const c=PY_CFG[si]||{};
+  if(c.specMode==='custom') return {min:c.specMin||0,nom:c.specNom||0,max:c.specMax||999};
+  const nom=c.specNom||0, tol=(c.specTol||5)/100;
+  return {min:parseFloat((nom*(1-tol)).toFixed(4)),nom,max:parseFloat((nom*(1+tol)).toFixed(4))};
+}
+
+function pyKgPerM(si, thk){
+  const c=PY_CFG[si]||{};
+  return yKgPerM(c.type||'round', thk, {...c, slitWidth:pySlits[si]?.width||0});
+}
+
+function pyBuildPipes(si){
+  const c=PY_CFG[si]||{};
+  const cut=c.cutLen||6000;
+  const coilL=pyCoilLength();
+  const thkM=pyGetThkMap(si);
+  const spec=pyGetSpec(si);
+  if(!coilL||!cut||cut<100) return [];
+  const POSES=['H','HM','M','MT','T'];
+  function interpThk(pct){
+    const pts=POSES.filter(p=>thkM[p]!=null).map((p,i,arr)=>({pct:POSES.indexOf(p)/4,thk:thkM[p]}));
+    if(!pts.length) return pyGetAvgThk(si)||2;
+    if(pct<=pts[0].pct) return pts[0].thk;
+    if(pct>=pts[pts.length-1].pct) return pts[pts.length-1].thk;
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i],b=pts[i+1];
+      if(pct>=a.pct&&pct<=b.pct){const t=(pct-a.pct)/(b.pct-a.pct);return a.thk+(b.thk-a.thk)*t;}
+    }
+    return pts[pts.length-1].thk;
+  }
+  function getZone(m){const p=m/coilL;if(p<.125)return'H';if(p<.375)return'HM';if(p<.625)return'M';if(p<.875)return'MT';return'T';}
+  const pipes=[];
+  let pos=0;
+  const cutM=cut/1000;
+  while(pos+cutM<=coilL+.0001){
+    const mid=Math.min(pos+cutM/2,coilL);
+    const thk=interpThk(Math.min(1,Math.max(0,mid/coilL)));
+    const km=pyKgPerM(si,thk);
+    const w=parseFloat((km*cutM).toFixed(3));
+    pipes.push({no:pipes.length+1,start:parseFloat(pos.toFixed(2)),end:parseFloat(Math.min(pos+cutM,coilL).toFixed(2)),
+      mid:parseFloat(mid.toFixed(2)),thk:parseFloat(thk.toFixed(4)),kgm:parseFloat(km.toFixed(4)),
+      w,coilL,ok:w>=spec.min&&w<=spec.max,lo:w<spec.min,hi:w>spec.max,zone:getZone(mid)});
+    pos+=cutM;
+  }
+  return pipes;
+}
+
+function pySegColor(p){return p.lo?'#fed7aa':p.hi?'#fca5a5':'#86efac';}
+
+function pyInitConfig(slits){
+  slits.forEach((s,si)=>{
+    if(PY_CFG[si]) return;
+    const avgThk=pyGetAvgThk(si)||2;
+    const nomKgm=Math.PI*(48.3-avgThk)*avgThk*7.85e-3;
+    const cutLen=6000;
+    const nomKg=parseFloat((nomKgm*cutLen/1000).toFixed(3));
+    PY_CFG[si]={
+      type:'round',od:48.3,a:40,H:60,W:40,web:100,flange:50,
+      cutLen,specMode:'std',specNom:nomKg,specTol:5,
+      specMin:parseFloat((nomKg*.95).toFixed(3)),specMax:parseFloat((nomKg*1.05).toFixed(3))
+    };
+    if(PY_OPEN[si]===undefined) PY_OPEN[si]=(si===0);
+  });
+}
+
+// ── GetPillHtml for predict-yield ────────────────────────────
+function pyGetPillHtml(si){
+  const thkM=pyGetThkMap(si);
+  if(!Object.keys(thkM).length) return {cls:'ypill-empty',txt:'ไม่มี Thickness'};
+  const spec=pyGetSpec(si);
+  if(!spec.nom) return {cls:'ypill-empty',txt:'ยังไม่ตั้ง Spec'};
+  const pipes=pyBuildPipes(si);
+  if(!pipes.length) return {cls:'ypill-empty',txt:'ตั้ง cut length ก่อน'};
+  const nOk=pipes.filter(p=>p.ok).length;
+  const nOut=pipes.length-nOk;
+  if(!nOut) return {cls:'ypill-ok',txt:`✓ ${nOk} OK`};
+  if(nOut<=Math.ceil(pipes.length*.3)) return {cls:'ypill-warn',txt:`⚠ ${nOk} OK / ${nOut} Out`};
+  return {cls:'ypill-bad',txt:`✕ ${nOk} OK / ${nOut} Out`};
+}
+
+// ── Build accordion block ─────────────────────────────────────
+function pyBuildSlitBlock(s,si){
+  const c=PY_CFG[si];
+  const isOpen=PY_OPEN[si];
+  const pill=pyGetPillHtml(si);
+  const avgThk=pyGetAvgThk(si);
+  const coilL=pyCoilLength();
+
+  const wrap=document.createElement('div');
+  wrap.className=`yield-slit-block${isOpen?' y-open':''}`;
+  wrap.id=`py-blk-${si}`;
+
+  const typeLabels={round:'ท่อกลม',shs:'SHS',rhs:'RHS',c:'เหล็กซี'};
+  const dimRound=`<div class="yield-field"><label>OD (mm)</label><input type="number" id="pyod-${si}" value="${c.od}" step="0.1" min="1" oninput="pyOnDimChange(${si})"></div>`;
+  const dimShs=`<div class="yield-field"><label>H=W (mm)</label><input type="number" id="pya-${si}" value="${c.a}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>`;
+  const dimRhs=`<div class="yield-field"><label>H (mm)</label><input type="number" id="pyrH-${si}" value="${c.H}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>
+    <div class="yield-field"><label>W (mm)</label><input type="number" id="pyrW-${si}" value="${c.W}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>`;
+  const dimC=`<div class="yield-field"><label>Web H (mm)</label><input type="number" id="pyweb-${si}" value="${c.web}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>
+    <div class="yield-field"><label>Flange W (mm)</label><input type="number" id="pyfl-${si}" value="${c.flange}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>`;
+
+  wrap.innerHTML=`
+    <div class="yield-slit-hdr" onclick="pyToggle(${si})" style="flex-wrap:nowrap;min-width:0;">
+      <div class="yield-dot" style="background:${s.color};flex-shrink:0;"></div>
+      <div class="yield-slit-label" style="color:${s.color};flex-shrink:0;">${s.id}</div>
+      <div class="yield-slit-meta" style="flex-shrink:0;white-space:nowrap;">
+        ${s.width}mm · ≈ <b>${coilL}</b> m
+      </div>
+      <div class="yield-hdr-strip-wrap" id="pyhdr-wrap-${si}" onclick="event.stopPropagation();pyToggle(${si})">
+        <div style="position:relative;">
+          <div id="pyhdr-strip-${si}" class="yield-hdr-strip"
+            onmousemove="pyHdrHover(${si},event)" onmouseleave="pyHdrLeave(${si})"
+            style="cursor:pointer;"></div>
+          <div id="pyhdr-tip-${si}" class="yield-hdr-tip"></div>
+        </div>
+        <div id="pyhdr-stats-${si}" class="yield-hdr-stats">
+          <span class="yield-hdr-stat-ok">— OK</span>
+          <span style="color:#94a3b8;">|</span>
+          <span id="pyhdr-out-${si}" class="yield-hdr-stat-out" style="display:none;">— Out</span>
+          <span id="pyhdr-count-${si}" style="color:#94a3b8;">—</span>
+        </div>
+      </div>
+      <span class="yield-status-pill ${pill.cls}" id="pypill-${si}" style="flex-shrink:0;">${pill.txt}</span>
+      <i class="fa-solid fa-chevron-down yield-chevron" style="flex-shrink:0;"></i>
+    </div>
+    <div class="yield-slit-body">
+      <!-- ① Product type -->
+      <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">① ประเภทสินค้า</div>
+      <div class="yield-type-tabs" id="pytabs-${si}">
+        ${['round','shs','rhs','c'].map(t=>`<div class="ytab${c.type===t?' yon':''}" onclick="pySetType(${si},'${t}',this)">${typeLabels[t]}</div>`).join('')}
+      </div>
+      <!-- ② Dimensions + cut length -->
+      <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">② ขนาด & ความยาวตัด</div>
+      <div class="yield-field-row" id="pydims-${si}">
+        <div id="pydim-round-${si}" style="display:${c.type==='round'?'contents':'none'};">${dimRound}</div>
+        <div id="pydim-shs-${si}"   style="display:${c.type==='shs'  ?'contents':'none'};">${dimShs}</div>
+        <div id="pydim-rhs-${si}"   style="display:${c.type==='rhs'  ?'contents':'none'};">${dimRhs}</div>
+        <div id="pydim-c-${si}"     style="display:${c.type==='c'    ?'contents':'none'};">${dimC}</div>
+        <div class="yield-field"><label>t (mm) — จากทำนาย</label>
+          <input class="auto-val" readonly id="pythk-${si}" value="${avgThk.toFixed(3)}"></div>
+        <div class="yield-field"><label>Cut length (mm)</label>
+          <input type="number" id="pycut-${si}" value="${c.cutLen}" step="1" min="1"
+            oninput="pyOnCutChange(${si})"></div>
+      </div>
+      <!-- ③ Weight spec -->
+      <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">③ เกณฑ์น้ำหนัก</div>
+      <div class="yield-spec-toggle" id="pyspec-toggle-${si}">
+        <span class="ystab${c.specMode==='std'?' yon':''}" onclick="pySetSpecMode(${si},'std',this)">มาตรฐาน ±%</span>
+        <span class="ystab${c.specMode==='custom'?' yon':''}" onclick="pySetSpecMode(${si},'custom',this)">Custom (kg)</span>
+      </div>
+      <div id="pyspec-std-${si}" style="display:${c.specMode==='std'?'flex':'none'};" class="yield-field-row">
+        <div class="yield-field"><label>Nominal (kg/เส้น)</label>
+          <input type="number" id="pynom-${si}" value="${c.specNom}" step="0.01" oninput="pyOnSpecChange(${si})"></div>
+        <div class="yield-field"><label>Tolerance ±%</label>
+          <input type="number" id="pytol-${si}" value="${c.specTol}" step="0.5" min="0" oninput="pyOnSpecChange(${si})"></div>
+      </div>
+      <div id="pyspec-custom-${si}" style="display:${c.specMode==='custom'?'flex':'none'};" class="yield-field-row">
+        <div class="yield-field"><label>Min (kg/เส้น)</label>
+          <input type="number" id="pysmin-${si}" value="${c.specMin}" step="0.01" oninput="pyOnSpecChange(${si})"></div>
+        <div class="yield-field"><label>Nominal (kg/เส้น)</label>
+          <input type="number" id="pysnom-${si}" value="${c.specNom}" step="0.01" oninput="pyOnSpecChange(${si})"></div>
+        <div class="yield-field"><label>Max (kg/เส้น)</label>
+          <input type="number" id="pysmax-${si}" value="${c.specMax}" step="0.01" oninput="pyOnSpecChange(${si})"></div>
+      </div>
+      <!-- ④ Result table -->
+      <div id="pyres-tbl-${si}"></div>
+      <!-- ⑤ Banner -->
+      <div id="pybanner-${si}"></div>
+      <!-- ⑥ Mini strip -->
+      <div class="yield-body-strip-section">
+        <div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin:10px 0 5px;">④ การแบ่งท่อตลอดม้วน</div>
+        <div style="position:relative;margin-bottom:3px;">
+          <div id="pymini-${si}" style="display:flex;height:34px;border-radius:8px;overflow:hidden;border:.5px solid #e2e8f0;cursor:crosshair;"
+            onmousemove="pyMiniHover(${si},event)" onmouseleave="pyMiniLeave(${si})"></div>
+          <div id="pymini-tip-${si}" style="position:absolute;background:#1e293b;color:white;border-radius:6px;padding:4px 9px;font-size:.65rem;font-weight:700;pointer-events:none;z-index:10;white-space:nowrap;top:-34px;transform:translateX(-50%);display:none;"></div>
+        </div>
+        <div id="pymini-pos-${si}" style="display:flex;position:relative;height:16px;margin-bottom:6px;"></div>
+        <div id="pymini-detail-${si}" style="background:#f8fafc;border-radius:7px;padding:6px 10px;font-size:.68rem;color:#64748b;line-height:1.8;margin-bottom:10px;min-height:34px;">↑ เลื่อนเมาส์บนแถบเพื่อดูแต่ละเส้น</div>
+      </div>
+      <div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">⑤ สรุปตาม Zone</div>
+      <div id="pyzone-${si}" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div class="yield-chart-wrap">
+        <div class="yield-chart-title">
+          <span><i class="fa-solid fa-chart-bar" style="margin-right:4px;"></i>น้ำหนักแต่ละเส้น (kg)</span>
+          <span id="pychart-safe-${si}" style="font-size:.65rem;color:var(--p);font-weight:700;"></span>
+        </div>
+        <div class="yield-chart-inner"><canvas id="pychart-${si}"></canvas></div>
+        <div class="yield-slider-row">
+          <label>Cut:</label>
+          <input type="range" id="pysl-${si}" min="500" max="16000" step="1"
+            value="${c.cutLen}" oninput="pyOnSlide(${si})">
+          <span class="yield-slider-val" id="pysv-${si}">${Math.round(c.cutLen)} mm</span>
+        </div>
+        <div class="yield-cut-readout" id="pycr-${si}"></div>
+      </div>
+    </div>`;
+  return wrap;
+}
+
+// ── Accordion toggle ──────────────────────────────────────────
+function pyToggle(si){
+  PY_OPEN[si]=!PY_OPEN[si];
+  document.getElementById(`py-blk-${si}`)?.classList.toggle('y-open',PY_OPEN[si]);
+}
+
+// ── Input handlers (mirror yOn* แต่ใช้ PY_ namespace) ────────
+function pyOnDimChange(si){
+  const c=PY_CFG[si]||{};
+  c.od   =parseFloat(document.getElementById(`pyod-${si}`)?.value)||48.3;
+  c.a    =parseFloat(document.getElementById(`pya-${si}`)?.value)||40;
+  c.H    =parseFloat(document.getElementById(`pyrH-${si}`)?.value)||60;
+  c.W    =parseFloat(document.getElementById(`pyrW-${si}`)?.value)||40;
+  c.web  =parseFloat(document.getElementById(`pyweb-${si}`)?.value)||100;
+  c.flange=parseFloat(document.getElementById(`pyfl-${si}`)?.value)||50;
+  if(c.specMode==='std') pyAutoNominal(si);
+  pyRenderSlit(si);
+}
+function pyOnCutChange(si){
+  const v=Math.max(100,parseFloat(document.getElementById(`pycut-${si}`)?.value)||6000);
+  PY_CFG[si].cutLen=v;
+  document.getElementById(`pysl-${si}`)&&(document.getElementById(`pysl-${si}`).value=v);
+  pyOnSlide(si,v);
+}
+function pyOnSlide(si,forceVal){
+  const sl=document.getElementById(`pysl-${si}`);
+  const v=forceVal!==undefined?parseFloat(forceVal):parseFloat(sl?.value||6000);
+  if(sl) sl.value=v;
+  const sv=document.getElementById(`pysv-${si}`);
+  if(sv) sv.textContent=Math.round(v)+' mm';
+  const cutInp=document.getElementById(`pycut-${si}`);
+  if(cutInp) cutInp.value=Math.round(v);
+  if(PY_CFG[si]) PY_CFG[si].cutLen=v;
+  pyRenderSlit(si);
+  pyRenderSummary();
+}
+function pyOnSpecChange(si){
+  const c=PY_CFG[si]||{};
+  if(c.specMode==='std'){
+    c.specNom=parseFloat(document.getElementById(`pynom-${si}`)?.value)||0;
+    c.specTol=parseFloat(document.getElementById(`pytol-${si}`)?.value)||5;
+  } else {
+    c.specMin=parseFloat(document.getElementById(`pysmin-${si}`)?.value)||0;
+    c.specNom=parseFloat(document.getElementById(`pysnom-${si}`)?.value)||0;
+    c.specMax=parseFloat(document.getElementById(`pysmax-${si}`)?.value)||999;
+  }
+  pyRenderSlit(si); pyRenderSummary();
+}
+function pySetType(si,type,el){
+  PY_CFG[si].type=type;
+  ['round','shs','rhs','c'].forEach(t=>{
+    const d=document.getElementById(`pydim-${t}-${si}`);
+    if(d) d.style.display=(t===type)?'contents':'none';
+  });
+  el.closest('.yield-type-tabs').querySelectorAll('.ytab').forEach(b=>b.classList.remove('yon'));
+  el.classList.add('yon');
+  if(PY_CFG[si].specMode==='std') pyAutoNominal(si);
+  pyRenderSlit(si); pyRenderSummary();
+}
+function pySetSpecMode(si,mode,el){
+  PY_CFG[si].specMode=mode;
+  el.closest('.yield-spec-toggle').querySelectorAll('.ystab').forEach(b=>b.classList.remove('yon'));
+  el.classList.add('yon');
+  document.getElementById(`pyspec-std-${si}`).style.display=mode==='std'?'flex':'none';
+  document.getElementById(`pyspec-custom-${si}`).style.display=mode==='custom'?'flex':'none';
+  if(mode==='std') pyAutoNominal(si);
+  pyRenderSlit(si); pyRenderSummary();
+}
+function pyAutoNominal(si){
+  const avgThk=pyGetAvgThk(si)||2;
+  const kgm=pyKgPerM(si,avgThk);
+  const nom=parseFloat((kgm*(PY_CFG[si].cutLen/1000)).toFixed(3));
+  PY_CFG[si].specNom=nom;
+  const el=document.getElementById(`pynom-${si}`);
+  if(el) el.value=nom;
+  const thkEl=document.getElementById(`pythk-${si}`);
+  if(thkEl) thkEl.value=avgThk.toFixed(3);
+}
+
+// ── Render single slit (mini strip + zone + chart + table + banner + pill) ─
+function pyRenderSlit(si){
+  pyRenderMiniStrip(si);
+  pyRenderZoneSummary(si);
+  pyRenderPipeChart(si);
+  pyRenderTable(si);
+  pyRenderBanner(si);
+  // update pill & header strip
+  const pill=pyGetPillHtml(si);
+  const pillEl=document.getElementById(`pypill-${si}`);
+  if(pillEl){pillEl.className=`yield-status-pill ${pill.cls}`;pillEl.textContent=pill.txt;}
+}
+
+function pyRenderMiniStrip(si){
+  const c=PY_CFG[si]||{};
+  const pipes=pyBuildPipes(si);
+  const coilL=pyCoilLength();
+  function fillStrip(el){
+    if(!el||!coilL) return;
+    el._pipes=pipes; el._coilL=coilL; el._cutLen=c.cutLen||6000;
+    el.innerHTML='';
+    const cutM=(c.cutLen||6000)/1000;
+    const remain=parseFloat((coilL-pipes.length*cutM).toFixed(3));
+    pipes.forEach(p=>{
+      const seg=document.createElement('div');
+      seg.style.cssText=`flex:${c.cutLen||6};background:${pySegColor(p)};border-right:.5px solid rgba(255,255,255,.18);flex-shrink:0;`;
+      el.appendChild(seg);
+    });
+    if(remain>.1){
+      const sc=document.createElement('div');
+      sc.style.cssText=`flex:${remain*1000};background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 2px,#f8fafc 2px,#f8fafc 5px);flex-shrink:0;`;
+      el.appendChild(sc);
+    }
+  }
+  fillStrip(document.getElementById(`pymini-${si}`));
+  // pos markers
+  const posRow=document.getElementById(`pymini-pos-${si}`);
+  if(posRow){
+    posRow.innerHTML='';
+    YIELD_THK_PROFILE.forEach(pt=>{
+      const m=document.createElement('div');
+      m.style.cssText=`position:absolute;left:${pt.pct*100}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;`;
+      m.innerHTML=`<div style="width:1px;height:5px;background:#94a3b8;"></div><div style="font-size:.55rem;color:#64748b;font-weight:700;">${pt.lbl}</div>`;
+      posRow.appendChild(m);
+    });
+  }
+  // header strip
+  fillStrip(document.getElementById(`pyhdr-strip-${si}`));
+  const nOk=pipes.filter(p=>p.ok).length;
+  const nOut=pipes.length-nOk;
+  const statsEl=document.getElementById(`pyhdr-stats-${si}`);
+  if(statsEl&&pipes.length){
+    statsEl.children[0].textContent=`${nOk} OK`;
+    const outSpan=document.getElementById(`pyhdr-out-${si}`);
+    if(outSpan){outSpan.textContent=`${nOut} Out`;outSpan.style.display=nOut>0?'':'none';}
+    const countSpan=document.getElementById(`pyhdr-count-${si}`);
+    if(countSpan) countSpan.textContent=`${pipes.length} เส้น @ ${Math.round(c.cutLen||6000)} mm`;
+  }
+}
+
+function pyRenderZoneSummary(si){
+  const pipes=pyBuildPipes(si);
+  const zoneEl=document.getElementById(`pyzone-${si}`);
+  if(!zoneEl) return;
+  const zones={H:[],HM:[],M:[],MT:[],T:[]};
+  pipes.forEach(p=>zones[p.zone].push(p));
+  zoneEl.innerHTML='';
+  ['H','HM','M','MT','T'].forEach(z=>{
+    const zp=zones[z]; if(!zp.length) return;
+    const nOk=zp.filter(p=>p.ok).length,nLo=zp.filter(p=>p.lo).length,nHi=zp.filter(p=>p.hi).length;
+    const zc=YIELD_ZONE_COLORS[z];
+    const div=document.createElement('div'); div.className='zone-card-y';
+    const pipsHtml=zp.slice(0,30).map(p=>`<div class="zone-pip-y" style="background:${pySegColor(p)}cc;" title="เส้น ${p.no}: ${p.w}kg"></div>`).join('')+
+      (zp.length>30?`<div style="font-size:.55rem;color:#94a3b8;align-self:center;">+${zp.length-30}</div>`:'');
+    div.innerHTML=`<div class="zc-lbl"><div class="zc-dot" style="background:${zc};"></div>${z}</div>
+      <div class="zc-pips">${pipsHtml}</div>
+      <div class="zc-stat">
+        ${nOk>0?`<span class="zbadge zbadge-ok">✓ ${nOk}</span> `:''}
+        ${nLo>0?`<span class="zbadge zbadge-lo">↓ ${nLo}</span> `:''}
+        ${nHi>0?`<span class="zbadge zbadge-hi">↑ ${nHi}</span>`:''}
+      </div>`;
+    zoneEl.appendChild(div);
+  });
+}
+
+function pyRenderPipeChart(si){
+  const c=PY_CFG[si]||{};
+  const spec=pyGetSpec(si);
+  const pipes=pyBuildPipes(si);
+  const canvas=document.getElementById(`pychart-${si}`);
+  if(!canvas||!pipes.length||!spec.nom) return;
+  if(PY_CHARTS[si]){PY_CHARTS[si].destroy();PY_CHARTS[si]=null;}
+  const coilL=pyCoilLength()||1;
+  const barW=Math.max(2,Math.min(18,540/pipes.length));
+  PY_CHARTS[si]=new Chart(canvas.getContext('2d'),{
+    data:{datasets:[
+      {type:'bar',label:'kg/เส้น',data:pipes.map(p=>({x:p.mid,y:p.w})),
+        backgroundColor:pipes.map(p=>pySegColor(p)+'aa'),borderColor:pipes.map(p=>pySegColor(p)),
+        borderWidth:1,borderRadius:2,barThickness:barW},
+      {type:'line',label:`Max ${spec.max.toFixed(3)}`,data:[{x:0,y:spec.max},{x:coilL,y:spec.max}],
+        borderColor:'#ef4444',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false},
+      {type:'line',label:`Min ${spec.min.toFixed(3)}`,data:[{x:0,y:spec.min},{x:coilL,y:spec.min}],
+        borderColor:'#f97316',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,parsing:false,animation:{duration:80},
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:ctx=>{const p=pipes.find(p=>Math.abs(p.mid-ctx[0].parsed.x)<(c.cutLen||6000)/1000*.6);return p?`เส้นที่ ${p.no}  (${p.start}–${p.end} m)`:'';},
+        label:ctx=>{if(ctx.dataset.label.includes('Max')||ctx.dataset.label.includes('Min'))return ctx.dataset.label;
+          const p=pipes.find(p=>Math.abs(p.mid-ctx.parsed.x)<(c.cutLen||6000)/1000*.6);if(!p)return'';
+          return `${p.w.toFixed(3)} kg ${p.lo?'⚠ Under':p.hi?'⚠ Over':'✓ OK'}  |  t=${p.thk.toFixed(3)}mm`;}
+      }}},
+      scales:{
+        x:{type:'linear',min:0,max:coilL,title:{display:true,text:'ตำแหน่งในม้วน (m)',font:{size:9},color:'#64748b'},
+          ticks:{font:{size:9},color:'#64748b',maxTicksLimit:8},grid:{color:'#f1f5f9'}},
+        y:{title:{display:true,text:'kg/เส้น',font:{size:9},color:'#64748b'},
+          ticks:{font:{size:9},callback:v=>v.toFixed(2)},
+          min:spec.min*.97,max:spec.max*1.03,grid:{color:'#f1f5f9'}}
+      }
+    }
+  });
+  const safeEl=document.getElementById(`pychart-safe-${si}`);
+  const nOk=pipes.filter(p=>p.ok).length;
+  if(safeEl) safeEl.textContent=`${pipes.length} เส้น | OK ${nOk} | Out ${pipes.length-nOk}`;
+}
+
+function pyRenderTable(si){
+  const c=PY_CFG[si]||{};
+  const spec=pyGetSpec(si);
+  const thkM=pyGetThkMap(si);
+  const el=document.getElementById(`pyres-tbl-${si}`);
+  if(!el) return;
+  if(!Object.keys(thkM).length){el.innerHTML='<div style="text-align:center;padding:14px;font-size:.72rem;color:#94a3b8;">ทำนายความหนาก่อน</div>';return;}
+  if(!spec.nom){el.innerHTML='<div style="text-align:center;padding:14px;font-size:.72rem;color:#94a3b8;">กรุณาตั้งค่า Nominal weight ก่อน</div>';return;}
+  const cut=c.cutLen||6000;
+  const pipes=pyBuildPipes(si);
+  if(!pipes.length){el.innerHTML='';return;}
+  const ws=pipes.map(p=>p.w);
+  const wMin=Math.min(...ws),wMax=Math.max(...ws),wAvg=parseFloat((ws.reduce((a,b)=>a+b,0)/ws.length).toFixed(3));
+  const nOk=pipes.filter(p=>p.ok).length,nLo=pipes.filter(p=>p.lo).length,nHi=pipes.filter(p=>p.hi).length;
+  const remain=parseFloat((pyCoilLength()-pipes.length*cut/1000).toFixed(2));
+  let html=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;">
+    <div style="background:#f0fdf4;border-radius:8px;padding:7px 10px;border-left:3px solid #22c55e;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">จำนวน</div>
+      <div style="font-size:.95rem;font-weight:700;color:#15803d;">${pipes.length} เส้น</div>
+      <div style="font-size:.58rem;color:#64748b;">เศษ ${remain>.1?Math.round(remain*1000)+'mm':'ไม่มี'}</div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:8px;padding:7px 10px;border-left:3px solid #22c55e;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">OK / Out</div>
+      <div style="font-size:.95rem;font-weight:700;color:#15803d;">${nOk} <span style="font-size:.7rem;color:${nLo+nHi>0?'#dc2626':'#94a3b8'};">/ ${nLo+nHi}</span></div>
+      <div style="font-size:.58rem;color:#64748b;">↓${nLo} ↑${nHi}</div>
+    </div>
+    <div style="background:#f8fafc;border-radius:8px;padding:7px 10px;border-left:3px solid #4361ee;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">Weight avg</div>
+      <div style="font-size:.95rem;font-weight:700;color:#1e293b;">${wAvg.toFixed(3)}</div>
+      <div style="font-size:.58rem;color:#64748b;">kg/เส้น</div>
+    </div>
+    <div style="background:#f8fafc;border-radius:8px;padding:7px 10px;border-left:3px solid #7c3aed;">
+      <div style="font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;">Range</div>
+      <div style="font-size:.82rem;font-weight:700;color:#1e293b;">${wMin.toFixed(3)}–${wMax.toFixed(3)}</div>
+      <div style="font-size:.58rem;color:#64748b;">kg/เส้น</div>
+    </div>
+  </div>`;
+  el.innerHTML=html;
+}
+
+function pyRenderBanner(si){
+  const spec=pyGetSpec(si);
+  const thkM=pyGetThkMap(si);
+  const el=document.getElementById(`pybanner-${si}`);
+  if(!el) return;
+  if(!Object.keys(thkM).length||!spec.nom){el.innerHTML='';return;}
+  const pipes=pyBuildPipes(si);
+  const outs=pipes.filter(p=>!p.ok);
+  const allOk=!outs.length;
+  const cls2=allOk?'yb-ok':outs.length>pipes.length*.3?'yb-bad':'yb-warn';
+  const title=allOk?`✓ ทุกเส้นอยู่ใน Spec (cut ${Math.round(PY_CFG[si].cutLen)} mm)`:`⚠ ${outs.length} เส้นหลุด Spec`;
+  el.innerHTML=`<div class="yield-safe-banner ${cls2}">
+    <div class="yb-icon">${allOk?'✅':'⚠'}</div>
+    <div><div class="yb-title" style="color:${allOk?'#15803d':outs.length>pipes.length*.3?'#b91c1c':'#92400e'};">${title}</div></div></div>`;
+}
+
+// ── Summary (overall) ─────────────────────────────────────────
+function pyRenderSummary(){
+  const sumGrid=document.getElementById('py-sum-grid');
+  const chipRow=document.getElementById('py-chip-row');
+  if(!sumGrid||!chipRow||!pySlits.length) return;
+  const coilL=pyCoilLength();
+  let totalPcs=0;
+  const chipData=[];
+  pySlits.forEach((s,si)=>{
+    const c=PY_CFG[si]||{};
+    const cut=c.cutLen||6000;
+    const pcs=coilL>0&&cut>0?Math.floor(coilL/(cut/1000)):0;
+    totalPcs+=pcs;
+    const pill=pyGetPillHtml(si);
+    chipData.push({s,si,pcs,pill,cut});
+  });
+  sumGrid.innerHTML=`
+    <div class="yield-sum-card" style="border-color:#4361ee;">
+      <div class="yield-sum-lbl">จำนวนรวม (ประมาณ)</div>
+      <div class="yield-sum-val">${totalPcs.toLocaleString()} <span class="yield-sum-unit">เส้น</span></div>
+      <div class="yield-sum-sub">${pySlits.map((_,si)=>{const l=pyCoilLength(),cut=PY_CFG[si]?.cutLen||6000;return `S${si+1}:${(cut>0&&l>0)?Math.floor(l/(cut/1000)):0}`;}).join(' + ')} เส้น</div>
+    </div>
+    <div class="yield-sum-card" style="border-color:#059669;">
+      <div class="yield-sum-lbl">ความยาวม้วน</div>
+      <div class="yield-sum-val">${coilL} <span class="yield-sum-unit">m</span></div>
+      <div class="yield-sum-sub">จาก Library</div>
+    </div>`;
+  chipRow.innerHTML=chipData.map(({s,si,pcs,pill,cut})=>`
+    <div class="yield-chip">
+      <div class="yield-chip-dot" style="background:${s.color};"></div>
+      <div>
+        <div class="yield-chip-name">${s.id} — ${pySlits[si]?.width}mm
+          &nbsp;<span class="yield-status-pill ${pill.cls}" style="font-size:.55rem;">${pill.txt}</span>
+        </div>
+        <div class="yield-chip-sub">${pcs} เส้น @ ${Math.round(cut)} mm</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Hover handlers ────────────────────────────────────────────
+function pyMiniHover(si,e){
+  const strip=document.getElementById(`pymini-${si}`);
+  const tip=document.getElementById(`pymini-tip-${si}`);
+  const detail=document.getElementById(`pymini-detail-${si}`);
+  if(!strip||!strip._pipes) return;
+  const rect=strip.getBoundingClientRect();
+  const pct=(e.clientX-rect.left)/rect.width;
+  const m=pct*strip._coilL;
+  const p=strip._pipes.find(pp=>m>=pp.start&&m<pp.end);
+  if(!p){if(tip)tip.style.display='none';return;}
+  if(tip){
+    const col=p.lo?'#f97316':p.hi?'#ef4444':'#22c55e';
+    tip.innerHTML=`<span>#${p.no}</span> <b style="color:${col};">${p.w.toFixed(3)} kg</b> ${p.lo?'⚠↓':p.hi?'⚠↑':'✓'}`;
+    tip.style.display='block';
+    const x=Math.min(Math.max(e.clientX-rect.left,50),rect.width-60);
+    tip.style.left=x+'px';
+  }
+  if(detail){
+    const spec=pyGetSpec(si);
+    const bg=p.lo?'#fff7ed':p.hi?'#fef2f2':'#f0fdf4';
+    const tc=p.lo?'#c2410c':p.hi?'#dc2626':'#15803d';
+    detail.style.background=bg;
+    detail.innerHTML=`<b style="color:${tc};">เส้นที่ ${p.no} — ${p.lo?'⚠ Under':p.hi?'⚠ Over':'✓ OK'}</b> &nbsp;|&nbsp; ${p.start}–${p.end} m &nbsp;|&nbsp; t: <b>${p.thk.toFixed(4)}</b> mm &nbsp;|&nbsp; <b style="color:${tc};">${p.w.toFixed(3)} kg</b> (spec ${spec.min.toFixed(3)}–${spec.max.toFixed(3)})`;
+  }
+}
+function pyMiniLeave(si){const tip=document.getElementById(`pymini-tip-${si}`);if(tip)tip.style.display='none';}
+function pyHdrHover(si,e){
+  const strip=document.getElementById(`pyhdr-strip-${si}`);
+  const tip=document.getElementById(`pyhdr-tip-${si}`);
+  if(!strip||!strip._pipes) return;
+  const rect=strip.getBoundingClientRect();
+  const pct=(e.clientX-rect.left)/rect.width;
+  const m=pct*strip._coilL;
+  const p=strip._pipes.find(pp=>m>=pp.start&&m<pp.end);
+  if(!p){if(tip)tip.style.display='none';return;}
+  if(tip){
+    const col=p.lo?'#f97316':p.hi?'#ef4444':'#22c55e';
+    tip.innerHTML=`<span>#${p.no}</span> <b style="color:${col};">${p.w.toFixed(3)} kg</b> ${p.lo?'⚠↓':p.hi?'⚠↑':'✓'}`;
+    tip.style.display='block';
+    const x=Math.min(Math.max(e.clientX-rect.left,40),rect.width-40);
+    tip.style.left=x+'px';
+  }
+}
+function pyHdrLeave(si){const tip=document.getElementById(`pyhdr-tip-${si}`);if(tip)tip.style.display='none';}
+
+// ── Main entry: called from runPrediction ─────────────────────
+function renderPredictYield(slits, posData){
+  // slits = [{id,width,color}], posData = {H:[v0,v1,...], ...}
+  pySlits=slits;
+  // store thkMap per slit
+  const POSES=['H','HM','M','MT','T'];
+  slits.forEach((s,si)=>{
+    const m={};
+    POSES.forEach(pos=>{ const v=posData[pos]?.[si]; if(v!=null) m[pos]=v; });
+    pyThkMap[si]=m;
+  });
+  // init config (ไม่ reset ถ้ามีอยู่แล้ว)
+  pyInitConfig(slits);
+
+  // try to set coil length from library
+  const key=document.getElementById('pred-profile').value;
+  if(key&&LIBRARY[key]){
+    const e=LIBRARY[key];
+    // estimate coil length from mother coil weight / strip width / avg thickness
+    if(e.avgMotherWeight&&e.sw&&e.thk){
+      const L=calcCoilLength(e.avgMotherWeight, e.sw, parseFloat(e.thk));
+      if(L>0){
+        const inp=document.getElementById('py-coil-length');
+        if(inp&&parseFloat(inp.value)===250) inp.value=Math.round(L); // set ครั้งแรกเท่านั้น
+      }
+    }
+  }
+
+  // render
+  const card=document.getElementById('pred-yield-card');
+  if(card) card.style.display='block';
+  const cont=document.getElementById('py-slits-container');
+  if(!cont) return;
+  cont.innerHTML='';
+  slits.forEach((s,si)=>cont.appendChild(pyBuildSlitBlock(s,si)));
+  slits.forEach((_,si)=>pyRenderSlit(si));
+  pyRenderSummary();
+}
+
+// ── Refresh all (เมื่อ coil length เปลี่ยน) ─────────────────
+function pyRefreshAll(){
+  if(!pySlits.length) return;
+  pySlits.forEach((_,si)=>pyRenderSlit(si));
+  pyRenderSummary();
+}
 
 </script>
 </body>
