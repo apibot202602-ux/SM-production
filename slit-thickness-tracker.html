@@ -1015,45 +1015,93 @@ function runPrediction(){
     banner.textContent=anyOut?'⚠ บางเส้นอาจเกิน Spec':'✅ ทุกเส้นอยู่ใน Spec';
   } else banner.style.display='none';
 
-  // ── Chart — x-axis เป็น meter จริงตาม coil length ──
+  // ── Chart — interpolate thickness ตลอดม้วน ──────────────────
   const predCoilL = parseFloat(document.getElementById('py-coil-length')?.value) || 250;
   const meterPts  = getActualMeters(predCoilL); // [0, L*0.25, L*0.5, L*0.75, L]
-  const posLbls   = {0:'H',1:'HM',2:'M',3:'MT',4:'T'};
+  const posLbls   = ['H','HM','M','MT','T'];
 
-  const datasets=slits.map(s=>({
+  // helper: linear interpolate thickness ที่ meter m สำหรับ slit si
+  function interpPredThk(si, m){
+    const thkM = posData; // posData[pos][si]
+    const pts = posLbls.map((p,pi)=>{
+      const v = posData[p]?.[si];
+      return v!=null ? {x: meterPts[pi], y: v} : null;
+    }).filter(Boolean);
+    if(!pts.length) return null;
+    if(m <= pts[0].x) return pts[0].y;
+    if(m >= pts[pts.length-1].x) return pts[pts.length-1].y;
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i], b=pts[i+1];
+      if(m>=a.x && m<=b.x){
+        const t=(m-a.x)/(b.x-a.x);
+        return parseFloat((a.y+(b.y-a.y)*t).toFixed(4));
+      }
+    }
+    return pts[pts.length-1].y;
+  }
+
+  // generate จุดหนาแน่น: ทุก 1m หรือ predCoilL/200 (อย่างน้อย 0.5m)
+  const step = Math.max(0.5, parseFloat((predCoilL/200).toFixed(1)));
+  const denseMs = [];
+  for(let m=0; m<=predCoilL+0.001; m=parseFloat((m+step).toFixed(2))) denseMs.push(Math.min(m,predCoilL));
+
+  const datasets = slits.map((s,si)=>({
     label:`${s.id} (${s.width}mm)`,
-    data:POSES.map((p,pi)=>{
-      const v=posData[p][POSES.indexOf(p)];
-      return v!=null?{x:meterPts[pi],y:v,posLabel:p}:null;
-    }).filter(d=>d!=null),
-    borderColor:s.color,backgroundColor:s.color+'22',tension:.35,pointRadius:5,fill:false
+    data: denseMs.map(m=>{
+      const y = interpPredThk(si, m);
+      return y!=null ? {x:m, y} : null;
+    }).filter(Boolean),
+    borderColor:s.color, backgroundColor:s.color+'22',
+    tension:0, pointRadius:0, borderWidth:2, fill:false
   }));
+
+  // marker จุด H/HM/M/MT/T บนเส้น
+  slits.forEach((s,si)=>{
+    const markerPts = posLbls.map((p,pi)=>{
+      const v=posData[p]?.[si];
+      return v!=null?{x:meterPts[pi],y:v,posLabel:p}:null;
+    }).filter(Boolean);
+    if(!markerPts.length) return;
+    datasets.push({
+      label:`_marker_${s.id}`,
+      data: markerPts,
+      borderColor:s.color, backgroundColor:s.color,
+      pointRadius:5, pointStyle:'circle',
+      showLine:false, fill:false
+    });
+  });
+
   if(usl&&lsl){
     [{l:'USL',v:usl},{l:'LSL',v:lsl}].forEach(({l,v})=>datasets.push({
-      label:`${l} (${v})`,data:[{x:0,y:v},{x:predCoilL,y:v}],
+      label:`${l} (${v})`,
+      data:[{x:0,y:v},{x:predCoilL,y:v}],
       borderColor:'#ef4444',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false
     }));
   }
+
   if(predChart) predChart.destroy();
   predChart=new Chart(document.getElementById('pred-chart').getContext('2d'),{
     type:'line',data:{datasets},
     options:{responsive:true,maintainAspectRatio:false,parsing:false,
-      plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}},
-        tooltip:{callbacks:{
-          title:ctx=>{
-            const pt=ctx[0].raw;
-            return pt?.posLabel?`${pt.posLabel} — ${ctx[0].parsed.x} m`:`${ctx[0].parsed.x} m`;
-          },
-          label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(3)} mm`
-        }}
+      plugins:{
+        legend:{position:'bottom',labels:{boxWidth:10,font:{size:10},
+          filter:item=>!item.text.startsWith('_marker_')}},
+        tooltip:{
+          filter:ctx=>!ctx.dataset.label.startsWith('_marker_'),
+          callbacks:{
+            title:ctx=>`${ctx[0].parsed.x.toFixed(1)} m`,
+            label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)} mm`
+          }
+        }
       },
       scales:{
         x:{type:'linear',min:0,max:predCoilL,
-          ticks:{font:{size:10},maxTicksLimit:6,
+          ticks:{font:{size:10},maxTicksLimit:8,
             callback:v=>{
-              // แสดง label H/HM/M/MT/T ที่ตำแหน่ง meter จริง
-              const idx=meterPts.findIndex(m=>Math.abs(m-v)<predCoilL*0.01);
-              return idx>=0?`${posLbls[idx]} (${v}m)`:`${v}m`;
+              // แสดง label ที่ตำแหน่ง H/HM/M/MT/T
+              const idx=meterPts.findIndex(m=>Math.abs(m-v)<step*1.5);
+              return idx>=0?`${posLbls[idx]}
+${v}m`:`${v}m`;
             }},
           title:{display:true,text:'ระยะทาง (เมตร)',font:{size:10}}},
         y:{ticks:{font:{size:10},callback:v=>v.toFixed(3)},
