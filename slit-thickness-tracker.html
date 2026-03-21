@@ -2336,7 +2336,7 @@ function yInitConfig(){
     const nomKgm=Math.PI*(48.3-thk)*thk*7.85e-3;
     const nomKgPer6=parseFloat((nomKgm*6).toFixed(3));
     YIELD_CFG[si]={
-      type:'round', od:48.3, a:40, H:60, W:40, web:100, flange:50,
+      type:'round', od:48.3, a:40, H:60, W:40, web:100, flange:50, lip:20,
       cutLen:6000.0,
       specMode:'std', specNom:nomKgPer6, specTol:5,
       specMin:parseFloat((nomKgPer6*0.95).toFixed(3)),
@@ -2416,11 +2416,14 @@ function yBuildSlitBlock(s,si){
       <input type="number" id="yrW-${si}" value="${c.W}" step="0.5" min="1"
         oninput="yOnDimChange(${si})"></div>`;
   const dimC=`
-    <div class="yield-field"><label>Web H (mm)</label>
+    <div class="yield-field"><label>Depth H (mm)</label>
       <input type="number" id="yweb-${si}" value="${c.web}" step="0.5" min="1"
         oninput="yOnDimChange(${si})"></div>
     <div class="yield-field"><label>Flange W (mm)</label>
       <input type="number" id="yfl-${si}" value="${c.flange}" step="0.5" min="1"
+        oninput="yOnDimChange(${si})"></div>
+    <div class="yield-field"><label>Lip (mm)</label>
+      <input type="number" id="ylip-${si}" value="${c.lip||20}" step="0.5" min="0"
         oninput="yOnDimChange(${si})"></div>`;
 
   const dimPanels={round:dimRound, shs:dimShs, rhs:dimRhs, c:dimC};
@@ -2865,6 +2868,7 @@ function yOnDimChange(si){
   c.W    =parseFloat(document.getElementById(`yrW-${si}`)?.value)||40;
   c.web  =parseFloat(document.getElementById(`yweb-${si}`)?.value)||100;
   c.flange=parseFloat(document.getElementById(`yfl-${si}`)?.value)||50;
+  c.lip  =parseFloat(document.getElementById(`ylip-${si}`)?.value)||20;
   // update auto nominal if std mode
   if(c.specMode==='std'){ yAutoNominal(si); }
   yRenderChart(si);
@@ -3403,7 +3407,7 @@ function pyInitConfig(slits){
     const cutLen=6000;
     const nomKg=parseFloat((nomKgm*cutLen/1000).toFixed(3));
     PY_CFG[si]={
-      type:'round',od:48.3,a:40,H:60,W:40,web:100,flange:50,
+      type:'round',od:48.3,a:40,H:60,W:40,web:100,flange:50,lip:20,
       cutLen,specMode:'std',specNom:nomKg,specTol:5,
       specMin:parseFloat((nomKg*.95).toFixed(3)),specMax:parseFloat((nomKg*1.05).toFixed(3))
     };
@@ -3443,8 +3447,9 @@ function pyBuildSlitBlock(s,si){
   const dimShs=`<div class="yield-field"><label>H=W (mm)</label><input type="number" id="pya-${si}" value="${c.a}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>`;
   const dimRhs=`<div class="yield-field"><label>H (mm)</label><input type="number" id="pyrH-${si}" value="${c.H}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>
     <div class="yield-field"><label>W (mm)</label><input type="number" id="pyrW-${si}" value="${c.W}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>`;
-  const dimC=`<div class="yield-field"><label>Web H (mm)</label><input type="number" id="pyweb-${si}" value="${c.web}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>
-    <div class="yield-field"><label>Flange W (mm)</label><input type="number" id="pyfl-${si}" value="${c.flange}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>`;
+  const dimC=`<div class="yield-field"><label>Depth H (mm)</label><input type="number" id="pyweb-${si}" value="${c.web}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>
+    <div class="yield-field"><label>Flange W (mm)</label><input type="number" id="pyfl-${si}" value="${c.flange}" step="0.5" min="1" oninput="pyOnDimChange(${si})"></div>
+    <div class="yield-field"><label>Lip (mm)</label><input type="number" id="pylip-${si}" value="${c.lip||20}" step="0.5" min="0" oninput="pyOnDimChange(${si})"></div>`;
 
   wrap.innerHTML=`
     <div class="yield-slit-hdr" onclick="pyToggle(${si})" style="flex-wrap:nowrap;min-width:0;">
@@ -3559,6 +3564,7 @@ function pyOnDimChange(si){
   c.W    =parseFloat(document.getElementById(`pyrW-${si}`)?.value)||40;
   c.web  =parseFloat(document.getElementById(`pyweb-${si}`)?.value)||100;
   c.flange=parseFloat(document.getElementById(`pyfl-${si}`)?.value)||50;
+  c.lip  =parseFloat(document.getElementById(`pylip-${si}`)?.value)||20;
   if(c.specMode==='std') pyAutoNominal(si);
   pyRenderSlit(si);
 }
