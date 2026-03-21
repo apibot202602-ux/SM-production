@@ -1015,15 +1015,22 @@ function runPrediction(){
     banner.textContent=anyOut?'⚠ บางเส้นอาจเกิน Spec':'✅ ทุกเส้นอยู่ใน Spec';
   } else banner.style.display='none';
 
-  // ── Chart ──
+  // ── Chart — x-axis เป็น meter จริงตาม coil length ──
+  const predCoilL = parseFloat(document.getElementById('py-coil-length')?.value) || 250;
+  const meterPts  = getActualMeters(predCoilL); // [0, L*0.25, L*0.5, L*0.75, L]
+  const posLbls   = {0:'H',1:'HM',2:'M',3:'MT',4:'T'};
+
   const datasets=slits.map(s=>({
     label:`${s.id} (${s.width}mm)`,
-    data:POSES.map((p,pi)=>({x:pi*25,y:posData[p][POSES.indexOf(p)]})).filter(d=>d.y!=null),
+    data:POSES.map((p,pi)=>{
+      const v=posData[p][POSES.indexOf(p)];
+      return v!=null?{x:meterPts[pi],y:v,posLabel:p}:null;
+    }).filter(d=>d!=null),
     borderColor:s.color,backgroundColor:s.color+'22',tension:.35,pointRadius:5,fill:false
   }));
   if(usl&&lsl){
     [{l:'USL',v:usl},{l:'LSL',v:lsl}].forEach(({l,v})=>datasets.push({
-      label:`${l} (${v})`,data:[{x:0,y:v},{x:100,y:v}],
+      label:`${l} (${v})`,data:[{x:0,y:v},{x:predCoilL,y:v}],
       borderColor:'#ef4444',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false
     }));
   }
@@ -1031,11 +1038,24 @@ function runPrediction(){
   predChart=new Chart(document.getElementById('pred-chart').getContext('2d'),{
     type:'line',data:{datasets},
     options:{responsive:true,maintainAspectRatio:false,parsing:false,
-      plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}},
+        tooltip:{callbacks:{
+          title:ctx=>{
+            const pt=ctx[0].raw;
+            return pt?.posLabel?`${pt.posLabel} — ${ctx[0].parsed.x} m`:`${ctx[0].parsed.x} m`;
+          },
+          label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(3)} mm`
+        }}
+      },
       scales:{
-        x:{type:'linear',min:0,max:100,
-          ticks:{font:{size:10},callback:v=>({0:'H',25:'HM',50:'M',75:'MT',100:'T'})[v]??''},
-          title:{display:true,text:'ตำแหน่ง',font:{size:10}}},
+        x:{type:'linear',min:0,max:predCoilL,
+          ticks:{font:{size:10},maxTicksLimit:6,
+            callback:v=>{
+              // แสดง label H/HM/M/MT/T ที่ตำแหน่ง meter จริง
+              const idx=meterPts.findIndex(m=>Math.abs(m-v)<predCoilL*0.01);
+              return idx>=0?`${posLbls[idx]} (${v}m)`:`${v}m`;
+            }},
+          title:{display:true,text:'ระยะทาง (เมตร)',font:{size:10}}},
         y:{ticks:{font:{size:10},callback:v=>v.toFixed(3)},
           title:{display:true,text:'ความหนา (mm)',font:{size:10}},
           suggestedMin:lsl?lsl-0.02:undefined,suggestedMax:usl?usl+0.02:undefined}
@@ -2058,8 +2078,12 @@ function saveToLibraryFromJob(){
   if(!hasGrid) return toast('กรุณาป้อนค่าใน Mother Grid ก่อน','error');
 
   const key=`${mill}|${thk}`;
+  // เก็บ avgMotherWeight เพื่อคำนวณความยาวม้วน default ใน Predict tab
+  const selCoils=COIL_LIST.filter(c=>c.selected&&c.weight>0);
+  const avgMW=selCoils.length?parseFloat((selCoils.reduce((a,c)=>a+c.weight,0)/selCoils.length).toFixed(1)):null;
   if(!LIBRARY[key]) LIBRARY[key]={mill,thk,sw,slitWidths:widths,profiles:[],avgResult:null,
-    usl:SPEC.usl,lsl:SPEC.lsl,target:SPEC.target};
+    usl:SPEC.usl,lsl:SPEC.lsl,target:SPEC.target,avgMotherWeight:avgMW};
+  else if(avgMW&&!LIBRARY[key].avgMotherWeight) LIBRARY[key].avgMotherWeight=avgMW;
 
   // snapshot avg grid from state
   const snapshot={};
@@ -3825,16 +3849,15 @@ function renderPredictYield(slits, posData){
   // init config (ไม่ reset ถ้ามีอยู่แล้ว)
   pyInitConfig(slits);
 
-  // try to set coil length from library
+  // default coil length จาก Library avgMotherWeight
   const key=document.getElementById('pred-profile').value;
   if(key&&LIBRARY[key]){
     const e=LIBRARY[key];
-    // estimate coil length from mother coil weight / strip width / avg thickness
     if(e.avgMotherWeight&&e.sw&&e.thk){
       const L=calcCoilLength(e.avgMotherWeight, e.sw, parseFloat(e.thk));
       if(L>0){
         const inp=document.getElementById('py-coil-length');
-        if(inp&&parseFloat(inp.value)===250) inp.value=Math.round(L); // set ครั้งแรกเท่านั้น
+        if(inp) inp.value=Math.round(L); // อัพเดทเสมอเมื่อเลือก profile ใหม่
       }
     }
   }
@@ -3855,6 +3878,8 @@ function pyRefreshAll(){
   if(!pySlits.length) return;
   pySlits.forEach((_,si)=>pyRenderSlit(si));
   pyRenderSummary();
+  // re-render predChart ให้ x-axis อัพเดทตาม coil length ใหม่
+  runPrediction();
 }
 
 </script>
