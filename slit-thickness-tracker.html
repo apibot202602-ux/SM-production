@@ -710,6 +710,7 @@ body{background:var(--bg);font-family:'Sarabun',sans-serif;color:#1e293b;font-si
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
           <div style="font-size:.72rem;font-weight:700;color:#334155;">
             <i class="fa-solid fa-scissors me-1" style="color:#7c3aed;"></i>กำหนด Slit Pattern
+            <span style="font-weight:400;color:#94a3b8;margin-left:4px;">(หน้ากว้าง mm)</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-size:.6rem;color:#94a3b8;font-weight:700;">TRIM</span>
@@ -895,12 +896,17 @@ function refreshPrediction(){
   const tr=parseFloat(document.getElementById('pred-trim-r').value)||0;
   const total=predSlits.reduce((a,b)=>a+(b.width||0),0)+tl+tr;
 
-  // Totals row
+  // Totals row — แสดงหน้ากว้างรวม เทียบกับ Library strip width
+  const libSw = LIBRARY[key]?.sw || 0;
+  const slitSum = predSlits.reduce((a,b)=>a+(b.width||0),0);
+  const scrap = libSw > 0 ? libSw - total : null;
+  const isOver = scrap !== null && scrap < 0;
   document.getElementById('pred-totals').innerHTML=
     `<span style="font-weight:700;color:#7c3aed;">${predSlits.length} Slit</span> &nbsp;·&nbsp; `+
-    predSlits.map((sl,i)=>`<span style="color:${PRED_COLORS[i]||'#64748b'};font-weight:700;">S${i+1}:${sl.width}</span>`).join(' + ')+
-    (tl||tr?` &nbsp;+ Trim ${tl}+${tr}`:'')+
-    ` &nbsp;= <b>${total.toFixed(1)}mm</b>`;
+    predSlits.map((sl,i)=>`<span style="color:${PRED_COLORS[i]||'#64748b'};font-weight:700;">S${i+1}:${sl.width}mm</span>`).join(' + ')+
+    (tl||tr?` &nbsp;+ Trim ${tl}+${tr}mm`:'')+
+    ` &nbsp;= <b>${total.toFixed(1)} mm</b>`+
+    (libSw>0 ? ` &nbsp;<span style="color:${isOver?'#dc2626':'#10b981'};font-weight:700;">/ Strip ${libSw}mm ${isOver?'⚠ เกิน':'· Scrap '+(scrap.toFixed(1))+'mm'}</span>` : '');
 
   // Diagram
   if(total>0){
