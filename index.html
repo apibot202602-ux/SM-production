@@ -4828,7 +4828,7 @@ function updateLegendDisplay(index, log) {
             });
             qcHtml += '</tbody></table></div>';
 
-            // 2. จัดการรูปภาพ (ถ้ามี)
+            // 2. จัดการรูปภาพหน้างาน (ถ้ามี) — เปลี่ยนจาก <a target="_blank"> เป็น lightbox
             let imgHtml = "";
             if (log.img && log.img.trim() !== "") {
                 const urls = log.img.split(',');
@@ -4836,13 +4836,46 @@ function updateLegendDisplay(index, log) {
                 urls.forEach(url => {
                     const fId = getDriveId(url.trim());
                     const thumb = fId ? 'https://lh3.googleusercontent.com/u/0/d/' + fId + '=w400-h400-p-k-no-iv1' : '';
-                    imgHtml += `<a href="${url.trim()}" target="_blank" class="text-decoration-none">
-                                    <img src="${thumb}" class="img-thumbnail shadow-sm rounded-3" 
-                                        style="width:100px; height:100px; object-fit:cover; border: 2px solid #fff;"
-                                        onerror="this.src='https://via.placeholder.com/100?text=No+Image'">
-                                </a>`;
+                    const full  = fId ? 'https://lh3.googleusercontent.com/u/0/d/' + fId + '=s1600-k-no-iv1' : url.trim();
+                    imgHtml += `<img src="${thumb}" class="img-thumbnail shadow-sm rounded-3"
+                                    style="width:100px; height:100px; object-fit:cover; border:2px solid #fff; cursor:zoom-in;"
+                                    onclick="openOrderLightbox('${full}')"
+                                    onerror="this.src='https://via.placeholder.com/100?text=No+Image'">`;
                 });
                 imgHtml += '</div></div>';
+            }
+
+            // 2b. ค้นหารูปใบสั่งผลิต (jobImg) จาก ALL_DATA.jobs ตาม log.job
+            let orderImgHtml = "";
+            const jobEntry = ALL_DATA.jobs ? ALL_DATA.jobs.find(j => j.jobId === log.job) : null;
+            const jobImgUrl = jobEntry ? jobEntry.jobImg : null;
+            if (jobImgUrl && jobImgUrl.trim() !== "") {
+                const fId   = getDriveId(jobImgUrl.trim());
+                const thumb = fId ? 'https://lh3.googleusercontent.com/u/0/d/' + fId + '=w400-h400-p-k-no-iv1' : jobImgUrl.trim();
+                const full  = fId ? 'https://lh3.googleusercontent.com/u/0/d/' + fId + '=s1600-k-no-iv1' : jobImgUrl.trim();
+                orderImgHtml = `
+                    <div class="p-3 bg-white border rounded-3 mb-3 shadow-sm">
+                        <h6 class="fw-bold text-muted small mb-2">
+                            <i class="fa-solid fa-file-invoice me-1 text-primary"></i> ใบสั่งผลิต
+                        </h6>
+                        <div class="d-flex align-items-center gap-3">
+                            <img src="${thumb}" alt="ใบสั่งผลิต"
+                                style="width:80px; height:80px; object-fit:cover; border-radius:10px;
+                                       border:2px solid #e2e8f0; cursor:zoom-in; transition:0.2s;"
+                                onclick="openOrderLightbox('${full}')"
+                                onmouseover="this.style.borderColor='#4361ee'; this.style.transform='scale(1.04)';"
+                                onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='scale(1)';"
+                                onerror="this.parentElement.innerHTML='<span class=\\'text-muted small\\'>โหลดรูปไม่สำเร็จ</span>'">
+                            <div>
+                                <div class="small fw-bold text-dark mb-1">Job: ${log.job}</div>
+                                <div class="small text-muted mb-2">กดที่รูปเพื่อดูขนาดเต็ม</div>
+                                <span class="badge rounded-pill" style="background:#eef2ff; color:#4361ee; font-size:0.7rem; cursor:pointer;"
+                                    onclick="openOrderLightbox('${full}')">
+                                    <i class="fa-solid fa-magnifying-glass-plus me-1"></i>ขยายรูป
+                                </span>
+                            </div>
+                        </div>
+                    </div>`;
             }
 
             // 3. ประกอบเนื้อหาลง Modal (ส่วน UI สรุป)
@@ -4907,6 +4940,7 @@ function updateLegendDisplay(index, log) {
                 </div>
                 <h6 class="fw-bold text-muted small text-uppercase mb-2"><i class="fa-solid fa-microscope me-1"></i> ตรวจสอบความหนา</h6>
                 ${qcHtml}
+                ${orderImgHtml}
                 <div class="p-3 bg-white border rounded-3 mb-3 small shadow-sm">
                     <span class="fw-bold text-muted">หมายเหตุ:</span> ${log.note !== "-" ? log.note : 'ไม่มีบันทึกเพิ่มเติม'}
                 </div>
@@ -6736,22 +6770,66 @@ function updateLegendDisplay(index, log) {
             }).filter(Boolean).join('<br>');
         }
 
+        // ====================================================
+        // ORDER IMAGE LIGHTBOX — เปิด/ปิดรูปใบสั่งผลิต
+        // ====================================================
+        function openOrderLightbox(imgUrl) {
+            const lb = document.getElementById('order-img-lightbox');
+            const img = document.getElementById('order-img-lightbox-img');
+            img.src = imgUrl;
+            lb.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeOrderLightbox() {
+            const lb = document.getElementById('order-img-lightbox');
+            lb.style.display = 'none';
+            document.getElementById('order-img-lightbox-img').src = '';
+            document.body.style.overflow = '';
+        }
+
+        // ปิด lightbox ด้วย Escape key (ร่วมกับ ND fullscreen)
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeOrderLightbox();
+                closeNdFullscreen(null, true);
+            }
+        });
+
         function closeNdFullscreen(event, force) {
             if (!force && event && event.target !== document.getElementById('nd-fullscreen-overlay')) return;
             document.getElementById('nd-fullscreen-overlay').classList.remove('active');
             document.body.style.overflow = '';
         }
 
-        // ปิดด้วย Escape key
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeNdFullscreen(null, true);
-        });
-
     </script>
 
     <div id="toast-container" style="position:fixed; top:20px; right:20px; z-index:10000;"></div>
 
   
+<!-- ====================================================
+     ORDER IMAGE LIGHTBOX OVERLAY
+     กดรูปใบสั่งผลิตใน Production Details → ขยายเต็มจอ
+     ==================================================== -->
+<div id="order-img-lightbox" onclick="closeOrderLightbox()" style="
+    display:none; position:fixed; inset:0; z-index:99999;
+    background:rgba(0,0,0,0.92); cursor:zoom-out;
+    align-items:center; justify-content:center;
+    flex-direction:column; padding:16px;">
+    <button onclick="closeOrderLightbox()" style="
+        position:absolute; top:16px; right:16px;
+        background:rgba(255,255,255,0.15); border:none; color:#fff;
+        width:40px; height:40px; border-radius:50%; font-size:1.2rem;
+        cursor:pointer; z-index:1; backdrop-filter:blur(4px);">✕</button>
+    <img id="order-img-lightbox-img" src="" alt="ใบสั่งผลิต"
+        style="max-width:100%; max-height:88vh; object-fit:contain;
+               border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.5);"
+        onclick="event.stopPropagation()">
+    <p style="color:rgba(255,255,255,0.5); font-size:0.75rem; margin-top:12px;">
+        กดที่ใดก็ได้เพื่อปิด
+    </p>
+</div>
+
 <!-- ND Fullscreen Overlay -->
 <div id="nd-fullscreen-overlay" onclick="closeNdFullscreen(event)">
   <div id="nd-fullscreen-inner">
